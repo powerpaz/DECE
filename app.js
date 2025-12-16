@@ -41,7 +41,7 @@ const TOP_N_BUFFERS = 120;               // solo si policy='top'
 
 // ===== “Tipo redes” (animación ligera) =====
 const ENABLE_NETWORK_ANIMATION = true;
-const ENABLE_NUCLEO_PULSE = true;
+const ENABLE_NUCLEO_PULSE = false;
 const MAX_CONNECTIONS_FOR_ANIM = 6000;   // si tienes más, se apaga para no freír el navegador
 
 // ===== Estimación de tiempo =====
