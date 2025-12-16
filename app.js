@@ -1,355 +1,487 @@
 /*************************************************
- * DECE Coverage Optimizer v2.0
- * Basado en metodología K-means (Lemenkova, 2013)
- * Criterios Modelo de Gestión DECE:
- * - Distancia máxima: 7.5 km
- * - Razón: 1 profesional / 450 estudiantes
- * - Tiempo desplazamiento: ≤ 1 hora
+ * DECE Coverage App (Leaflet + CSV) - v4.1
+ * Objetivo: dejar SOLO buffers "necesarios" cubriendo 95–98% de satélites
+ *
+ * - CSV robusto (delimiter ';' + BOM)
+ * - Detecta columnas por encabezado
+ * - Grid index para acelerar búsqueda dentro de 7.5 km
+ * - Selección de buffers: Set Cover Greedy (policy='cover')
+ * - Dibujo: satélites siempre; buffers + conexiones solo de núcleos seleccionados
  *************************************************/
 
-const CONFIG = {
-  BUFFER_RADIUS_M: 7500,
-  PROF_RATIO: 450,
-  MAX_TRAVEL_TIME_MIN: 60,
-  AVG_SPEED_KMH: 30,
-  GRID_CELL_DEG: 0.10,
-  CLUSTER_RADIUS: 6000,
-  MIN_CLUSTER_SIZE: 2
-};
-
-const ECUADOR_CENTER = [-1.831239, -78.183406];
-
 let map;
-let allData = { nucleos: [], satellites: [], todas: [] };
-let nucleoStats = new Map();
-let optimizationData = null;
-let viasData = null;
 
 const layers = {
-  nucleos: L.featureGroup(),
-  satellites: L.featureGroup(),
-  buffers: L.featureGroup(),
-  connections: L.featureGroup(),
-  optimized: L.featureGroup(),
-  vias: L.featureGroup(),
-  uncovered: L.featureGroup()
+  nucleos: L.featureGroup(),         // canvas
+  satellites: L.featureGroup(),      // canvas
+  buffers: L.featureGroup(),         // canvas (solo seleccionados)
+  connections: L.featureGroup()      // canvas (solo seleccionados)
 };
+
+// ===== Parámetros base =====
+const BUFFER_RADIUS_M = 7500;
+const ECUADOR_CENTER = [-1.831239, -78.183406];
 
 const canvasRenderer = L.canvas({ padding: 0.5 });
 
-document.addEventListener('DOMContentLoaded', () => {
+// Grid en grados ~ 0.10° ≈ 11 km
+const GRID_CELL_DEG = 0.10;
+
+// ===== Política de “buffers necesarios” (95–98%) =====
+const BUFFER_SELECTION_POLICY = "cover"; // 'cover' | 'used' | 'top'
+const TARGET_COVERAGE = 0.97;            // ✅ 0.95–0.98 (default 0.97)
+const MAX_BUFFERS = 220;                 // ✅ baja saturación (180–300)
+const MIN_SATS_PER_BUFFER = 3;           // ✅ elimina ruido (sube/baja según densidad)
+const TOP_N_BUFFERS = 120;               // solo si policy='top'
+
+let _initialized = false;
+
+document.addEventListener("DOMContentLoaded", () => {
+  if (_initialized) return;
+  _initialized = true;
+
   initMap();
   setupControls();
-  loadAllData();
+  loadCSV();
 });
 
+// ===== Mapa =====
 function initMap() {
-  map = L.map('map', {
+  map = L.map("map", {
     center: ECUADOR_CENTER,
     zoom: 7,
+    zoomControl: true,
     preferCanvas: true,
     renderer: canvasRenderer
   });
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap',
+  const osmLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© OpenStreetMap contributors",
     maxZoom: 19
+  });
+
+  const satelliteLayer = L.tileLayer(
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    { attribution: "© Esri", maxZoom: 19 }
+  );
+
+  osmLayer.addTo(map);
+
+  L.control.layers({
+    "OpenStreetMap": osmLayer,
+    "Satélite": satelliteLayer
   }).addTo(map);
 
-  Object.keys(layers).forEach(k => {
-    if (k !== 'vias') layers[k].addTo(map);
+  Object.values(layers).forEach(layer => layer.addTo(map));
+}
+
+// ===== CSV =====
+function loadCSV() {
+  const overlay = document.getElementById("loadingOverlay");
+  const overlayText = overlay ? overlay.querySelector(".loading-text") : null;
+
+  if (!window.Papa) {
+    if (overlayText) overlayText.textContent = "Falta PapaParse. Revisa index.html.";
+    console.error("PapaParse no está cargado");
+    return;
+  }
+
+  if (overlayText) overlayText.textContent = "Cargando CSV…";
+
+  Papa.parse("DECE_CRUCE_X_Y_NUC_SAT.csv", {
+    download: true,
+    delimiter: ";",
+    skipEmptyLines: "greedy",
+    worker: true,
+    beforeFirstChunk: (chunk) => chunk.replace(/^\uFEFF/, ""),
+    complete: (results) => {
+      const rows = results.data || [];
+      if (!rows.length) {
+        if (overlayText) overlayText.textContent = "CSV vacío o no se pudo leer.";
+        return;
+      }
+
+      if (overlayText) overlayText.textContent = "Preparando columnas…";
+
+      const resolved = resolveColumnIndexes(rows[0] || []);
+      const idx = resolved.idx;
+      if (resolved.issues.length) console.warn("Column issues:", resolved.issues);
+
+      const mapped = mapRowsToData(rows, idx);
+      const data = mapped.data;
+      const bounds = mapped.bounds;
+
+      if (!data.length) {
+        if (overlayText) overlayText.textContent = "No hay registros válidos (revisa LAT/LON y COD_GDECE).";
+        return;
+      }
+
+      if (bounds && bounds.isValid()) {
+        map.fitBounds(bounds.pad(0.10), { animate: false });
+      }
+
+      processData(data);
+    },
+    error: (err) => {
+      console.error(err);
+      if (overlayText) overlayText.textContent = "Error al descargar CSV (ver consola / Network).";
+    }
   });
 }
 
-async function loadAllData() {
-  const overlay = document.getElementById('loadingOverlay');
-  const overlayText = overlay?.querySelector('.loading-text');
-  const subtext = document.getElementById('loadingSubtext');
+// Detecta columnas por encabezado
+function resolveColumnIndexes(headerRow) {
+  const norm = (s) => String(s ?? "").replace(/^\uFEFF/, "").trim().toLowerCase();
+  const header = headerRow.map(norm);
 
-  try {
-    if (overlayText) overlayText.textContent = 'Cargando instituciones...';
-    const csvResponse = await fetch('instituciones.csv');
-    const csvText = await csvResponse.text();
-    parseCSV(csvText);
-    if (subtext) subtext.textContent = allData.todas.length + ' registros';
+  const findOne = (candidates) => {
+    for (let j = 0; j < candidates.length; j++) {
+      const c = candidates[j];
+      const i = header.indexOf(norm(c));
+      if (i >= 0) return i;
+    }
+    return -1;
+  };
 
-    if (overlayText) overlayText.textContent = 'Cargando red vial...';
-    try {
-      const viasResponse = await fetch('vias_principales.geojson');
-      viasData = await viasResponse.json();
-    } catch (e) { console.warn('No vías:', e); }
+  const idx = {
+    lat: findOne(["latitud", "lat", "latitude"]),
+    lng: findOne(["longitud", "lon", "lng", "longitude"]),
+    cod: findOne(["cod_gdece", "cod gdece"]),
+    name: findOne(["nombre_institución", "nombre_institucion", "nombre", "Nombre_Institución"]),
+    dist: findOne(["distrito"]),
+    zone: findOne(["zona"]),
+    students: findOne(["total estudiantes", "total_estudiantes", "TOTAL ESTUDIANTES"]),
+    profs: findOne(["po_profdece", "PO_ProfDECE", "profdece", "profesionales"])
+  };
 
-    try {
-      const optResponse = await fetch('optimization_data.json');
-      optimizationData = await optResponse.json();
-    } catch (e) { console.warn('No optimization data'); }
+  const issues = [];
+  if (idx.lat < 0) issues.push("No encuentro columna LATITUD.");
+  if (idx.lng < 0) issues.push("No encuentro columna LONGITUD.");
+  if (idx.cod < 0) issues.push("No encuentro columna COD_GDECE.");
 
-    if (overlayText) overlayText.textContent = 'Analizando cobertura...';
-    processData();
-  } catch (err) {
-    console.error('Error:', err);
-    if (overlayText) overlayText.textContent = 'Error: ' + err.message;
-  }
+  return { idx, issues };
 }
 
-function parseCSV(csvText) {
-  const cleanedText = csvText.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
-  const results = Papa.parse(cleanedText, { delimiter: ';', skipEmptyLines: 'greedy' });
-  const rows = results.data || [];
-  if (rows.length < 2) return;
-
-  const { idx } = resolveColumnIndexes(rows[0]);
+function mapRowsToData(rows, idx) {
+  const data = [];
   const bounds = L.latLngBounds();
 
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
     if (!Array.isArray(r)) continue;
 
-    const lat = parseNum(r[idx.lat]);
-    const lng = parseNum(r[idx.lng]);
-    const cod = parseInt(r[idx.cod]) || 0;
+    const lat = parseFloat(r[idx.lat]);
+    const lng = parseFloat(r[idx.lng]);
+    const cod = Number(r[idx.cod]);
 
-    if (isNaN(lat) || isNaN(lng) || ![1,2,3,4,5].includes(cod)) continue;
+    if (Number.isNaN(lat) || Number.isNaN(lng)) continue;
+    if ([2, 3, 4, 5].indexOf(cod) === -1) continue; // ignora 1
 
-    allData.todas.push({
-      lat, lng, cod,
-      name: r[idx.name] || 'Sin nombre',
-      dist: r[idx.dist] || 'N/D',
-      zone: r[idx.zone] || 'N/D',
-      students: parseNum(r[idx.students]) || 0,
-      profs: parseNum(r[idx.profs]) || 0
-    });
+    const item = {
+      lat: lat,
+      lng: lng,
+      cod: cod,
+      name: idx.name >= 0 ? (r[idx.name] || "IE sin nombre") : "IE sin nombre",
+      dist: idx.dist >= 0 ? (r[idx.dist] || "N/D") : "N/D",
+      zone: idx.zone >= 0 ? (r[idx.zone] || "N/D") : "N/D",
+      students: idx.students >= 0 ? (Number(r[idx.students]) || 0) : 0,
+      profs: idx.profs >= 0 ? (Number(r[idx.profs]) || 0) : 0
+    };
+
+    data.push(item);
     bounds.extend([lat, lng]);
   }
 
-  allData.nucleos = allData.todas.filter(d => [3,4,5].includes(d.cod));
-  allData.satellites = allData.todas.filter(d => d.cod === 2);
-  if (bounds.isValid()) map.fitBounds(bounds.pad(0.05), { animate: false });
+  return { data, bounds };
 }
 
-function resolveColumnIndexes(headerRow) {
-  const norm = s => String(s ?? '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const header = headerRow.map(norm);
-  const findOne = candidates => {
-    for (const c of candidates) {
-      const i = header.indexOf(norm(c));
-      if (i >= 0) return i;
-    }
-    for (const c of candidates) {
-      const i = header.findIndex(h => h.includes(norm(c)));
-      if (i >= 0) return i;
-    }
-    return -1;
-  };
-  return {
-    idx: {
-      lat: findOne(['latitud', 'lat']),
-      lng: findOne(['longitud', 'lng', 'lon']),
-      cod: findOne(['cod_gdece']),
-      name: findOne(['nombre_institucion', 'nombre']),
-      dist: findOne(['distrito']),
-      zone: findOne(['zona']),
-      students: findOne(['total estudiantes', 'total_estudiantes']),
-      profs: findOne(['po_profdece', 'profdece'])
-    }
-  };
-}
-
-function parseNum(val) {
-  if (val == null || val === '') return NaN;
-  return parseFloat(String(val).replace(',', '.').trim());
-}
-
-function processData() {
+// ===== Core =====
+function processData(data) {
+  // Limpia capas
   Object.values(layers).forEach(l => l.clearLayers());
-  nucleoStats.clear();
 
-  const { nucleos, satellites } = allData;
+  const overlay = document.getElementById("loadingOverlay");
+  const overlayText = overlay ? overlay.querySelector(".loading-text") : null;
+
+  const nucleos = data.filter(d => d.cod === 3 || d.cod === 4 || d.cod === 5);
+  const satellites = data.filter(d => d.cod === 2);
+
   if (!nucleos.length && !satellites.length) {
-    document.getElementById('loadingOverlay')?.classList.add('hidden');
+    if (overlayText) overlayText.textContent = "Sin datos para dibujar (COD_GDECE 2/3/4/5).";
     return;
   }
 
-  const grid = buildGridIndex(nucleos);
+  if (overlayText) overlayText.textContent = "Indexando núcleos…";
+  const nucleoGrid = buildGridIndex(nucleos);
 
-  for (const n of nucleos) {
-    const k = keyLatLng(n.lat, n.lng);
-    nucleoStats.set(k, { nucleo: n, satellites: [], totalStudents: n.students || 0 });
-  }
+  // satCandidates[si] = [{ni, dist}, ...] (núcleos dentro de 7.5km)
+  if (overlayText) overlayText.textContent = "Calculando coberturas…";
+  const satCandidates = new Array(satellites.length);
 
-  let satCovered = 0;
-  const uncoveredSats = [];
+  // Stats por núcleo (por índice)
+  const nucleoStats = nucleos.map(n => ({
+    nucleo: n,
+    satIdx: [],
+    totalStudents: n.students || 0
+  }));
 
-  for (const s of satellites) {
-    const { bestNucleo, bestDist } = findBestNucleo(s, grid);
-    s.covered = !!bestNucleo;
-    s.assignedNucleo = bestNucleo;
-    s.distance = bestDist;
+  // Construir candidates + closest (para stats)
+  for (let si = 0; si < satellites.length; si++) {
+    const s = satellites[si];
+    const candidates = findNucleosWithin(s, nucleos, nucleoGrid);
+    satCandidates[si] = candidates;
 
-    if (bestNucleo) {
-      satCovered++;
-      const k = keyLatLng(bestNucleo.lat, bestNucleo.lng);
-      const st = nucleoStats.get(k);
-      if (st) {
-        st.satellites.push(s);
-        st.totalStudents += (s.students || 0);
+    // closest para stats (no define buffers)
+    let bestNi = -1;
+    let bestDist = BUFFER_RADIUS_M + 1;
+    for (let c = 0; c < candidates.length; c++) {
+      if (candidates[c].dist < bestDist) {
+        bestDist = candidates[c].dist;
+        bestNi = candidates[c].ni;
       }
-    } else {
-      uncoveredSats.push(s);
+    }
+    if (bestNi >= 0) {
+      nucleoStats[bestNi].satIdx.push(si);
+      nucleoStats[bestNi].totalStudents += (s.students || 0);
     }
   }
 
-  const nucleosActivos = Array.from(nucleoStats.entries())
-    .filter(([k, st]) => st.satellites.length > 0)
-    .map(([k, st]) => st.nucleo);
+  // Selección de núcleos “necesarios” para buffers/conexiones
+  if (overlayText) overlayText.textContent = "Seleccionando buffers necesarios (cover)…";
+  const selected = selectNeededNucleos({
+    policy: BUFFER_SELECTION_POLICY,
+    nucleos: nucleos,
+    satellites: satellites,
+    nucleoStats: nucleoStats,
+    satCandidates: satCandidates
+  });
 
-  drawBuffers(nucleosActivos);
-  drawSatellites(satellites);
-  drawNucleos(nucleos);
-  drawConnections(satellites);
+  // Dibujar: satélites siempre, núcleos siempre (pero seleccionados resaltados),
+  // buffers + conexiones solo seleccionados
+  if (overlayText) overlayText.textContent = "Dibujando mapa (limpio)…";
 
-  if (optimizationData?.suggestions) {
-    showOptimizationSuggestions(optimizationData.suggestions);
-  }
+  drawAllSatellites(satellites, selected, satCandidates);
+  drawSelectedNucleos(nucleos, nucleoStats, selected);
+  drawSelectedBuffersAndConnections(nucleos, satellites, satCandidates, selected);
 
-  const totalStudents = allData.todas.reduce((s, d) => s + (d.students || 0), 0);
-  const profActuales = allData.todas.reduce((s, d) => s + (d.profs || 0), 0);
-  const profNecesarios = Math.ceil(totalStudents / CONFIG.PROF_RATIO);
-  const coveragePercent = satellites.length > 0 ? ((satCovered / satellites.length) * 100).toFixed(1) : '0.0';
-  const avgTravelTime = calculateAvgTravelTime(satellites.filter(s => s.covered));
+  const coveredBySelected = countCoveredBySelected(satCandidates, selected);
+  const coveragePercent = satellites.length
+    ? ((coveredBySelected / satellites.length) * 100).toFixed(1)
+    : "0.0";
 
   updateStatistics({
     totalNucleos: nucleos.length,
     totalSatellites: satellites.length,
-    nucleosActivos: nucleosActivos.length,
-    sinCobertura: uncoveredSats.length,
-    coveragePercent,
-    totalStudents,
-    profActuales,
-    profNecesarios,
-    avgTravelTime
+    coveragePercent: coveragePercent,
+    totalStudents: data.reduce((sum, d) => sum + (d.students || 0), 0)
   });
 
-  updateTopNucleos(nucleoStats);
-  document.getElementById('loadingOverlay')?.classList.add('hidden');
-  setTimeout(() => document.getElementById('statsPanel')?.classList.add('active'), 300);
+  updateTopNucleosFromStats(nucleoStats);
+
+  if (overlay) overlay.classList.add("hidden");
 }
 
-function buildGridIndex(nucleos) {
-  const grid = new Map();
-  for (const n of nucleos) {
-    const k = gridKey(n.lat, n.lng);
-    if (!grid.has(k)) grid.set(k, []);
-    grid.get(k).push(n);
+// ===== Selección de “buffers necesarios” =====
+function selectNeededNucleos(args) {
+  const policy = args.policy;
+  const nucleos = args.nucleos;
+  const satellites = args.satellites;
+  const nucleoStats = args.nucleoStats;
+  const satCandidates = args.satCandidates;
+
+  if (!satellites.length || !nucleos.length) return new Set();
+
+  if (policy === "top") {
+    const order = nucleoStats
+      .map((st, i) => ({ i: i, k: st.satIdx.length }))
+      .sort((a, b) => b.k - a.k)
+      .slice(0, TOP_N_BUFFERS)
+      .filter(x => x.k >= MIN_SATS_PER_BUFFER)
+      .map(x => x.i);
+    return new Set(order);
   }
-  return grid;
-}
 
-function gridKey(lat, lng) {
-  return Math.floor(lat / CONFIG.GRID_CELL_DEG) + '|' + Math.floor(lng / CONFIG.GRID_CELL_DEG);
-}
+  if (policy === "used") {
+    const used = [];
+    for (let i = 0; i < nucleoStats.length; i++) {
+      if (nucleoStats[i].satIdx.length >= MIN_SATS_PER_BUFFER) used.push(i);
+    }
+    if (used.length > MAX_BUFFERS) {
+      used.sort((a, b) => nucleoStats[b].satIdx.length - nucleoStats[a].satIdx.length);
+      return new Set(used.slice(0, MAX_BUFFERS));
+    }
+    return new Set(used);
+  }
 
-function keyLatLng(lat, lng) {
-  return lat.toFixed(6) + ',' + lng.toFixed(6);
-}
+  // policy === "cover" (set cover greedy)
+  const total = satellites.length;
+  const target = Math.ceil(total * TARGET_COVERAGE);
 
-function findBestNucleo(satellite, grid) {
-  const parts = gridKey(satellite.lat, satellite.lng).split('|').map(Number);
-  const gx = parts[0], gy = parts[1];
-  let bestNucleo = null;
-  let bestDist = CONFIG.BUFFER_RADIUS_M;
+  const uncovered = new Array(total);
+  for (let i = 0; i < total; i++) uncovered[i] = true;
+  let uncoveredCount = total;
 
-  for (let dx = -1; dx <= 1; dx++) {
-    for (let dy = -1; dy <= 1; dy++) {
-      const candidates = grid.get((gx + dx) + '|' + (gy + dy));
-      if (!candidates) continue;
-      for (const n of candidates) {
-        const d = haversineDistance(satellite.lat, satellite.lng, n.lat, n.lng);
-        if (d <= CONFIG.BUFFER_RADIUS_M && d < bestDist) {
-          bestDist = d;
-          bestNucleo = n;
-        }
+  // coverSets[ni] = [si, si, ...] satélites dentro del buffer del núcleo ni
+  const coverSets = new Array(nucleos.length);
+  for (let ni = 0; ni < nucleos.length; ni++) coverSets[ni] = [];
+
+  for (let si = 0; si < total; si++) {
+    const cand = satCandidates[si] || [];
+    for (let c = 0; c < cand.length; c++) {
+      coverSets[cand[c].ni].push(si);
+    }
+  }
+
+  const selected = new Set();
+
+  while ((total - uncoveredCount) < target && selected.size < MAX_BUFFERS) {
+    let bestNi = -1;
+    let bestGain = 0;
+
+    for (let ni = 0; ni < coverSets.length; ni++) {
+      if (selected.has(ni)) continue;
+      if (coverSets[ni].length < MIN_SATS_PER_BUFFER) continue;
+
+      let gain = 0;
+      const arr = coverSets[ni];
+      for (let k = 0; k < arr.length; k++) {
+        if (uncovered[arr[k]]) gain++;
+      }
+
+      if (gain > bestGain) {
+        bestGain = gain;
+        bestNi = ni;
+      }
+    }
+
+    if (bestNi < 0 || bestGain === 0) break;
+
+    selected.add(bestNi);
+
+    const arr = coverSets[bestNi];
+    for (let k = 0; k < arr.length; k++) {
+      const si = arr[k];
+      if (uncovered[si]) {
+        uncovered[si] = false;
+        uncoveredCount--;
       }
     }
   }
-  return { bestNucleo, bestDist };
+
+  return selected;
 }
 
-function calculateAvgTravelTime(covered) {
-  if (!covered.length) return 0;
-  const total = covered.reduce((sum, s) => sum + (s.distance / 1000 / CONFIG.AVG_SPEED_KMH * 60), 0);
-  return (total / covered.length).toFixed(1);
+function countCoveredBySelected(satCandidates, selected) {
+  let covered = 0;
+  for (let si = 0; si < satCandidates.length; si++) {
+    const cand = satCandidates[si] || [];
+    let ok = false;
+    for (let c = 0; c < cand.length; c++) {
+      if (selected.has(cand[c].ni)) {
+        ok = true;
+        break;
+      }
+    }
+    if (ok) covered++;
+  }
+  return covered;
 }
 
-function haversineDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371000;
-  const p1 = lat1 * Math.PI / 180, p2 = lat2 * Math.PI / 180;
-  const dp = (lat2 - lat1) * Math.PI / 180;
-  const dl = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dp/2)**2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-}
+// ===== Dibujo =====
+function drawAllSatellites(satellites, selected, satCandidates) {
+  for (let si = 0; si < satellites.length; si++) {
+    const s = satellites[si];
 
-function drawBuffers(nucleosActivos) {
-  for (const n of nucleosActivos) {
-    const k = keyLatLng(n.lat, n.lng);
-    const st = nucleoStats.get(k);
-    const count = st ? st.satellites.length : 0;
-    L.circle([n.lat, n.lng], {
-      radius: CONFIG.BUFFER_RADIUS_M,
-      fillColor: '#58a6ff',
-      color: '#58a6ff',
+    // cubierto si existe algún núcleo seleccionado dentro de 7.5 km
+    let covered = false;
+    let bestDist = BUFFER_RADIUS_M + 1;
+
+    const cand = satCandidates[si] || [];
+    for (let c = 0; c < cand.length; c++) {
+      if (selected.has(cand[c].ni) && cand[c].dist < bestDist) {
+        bestDist = cand[c].dist;
+        covered = true;
+      }
+    }
+
+    const color = covered ? "#58a6ff" : "#6e7681";
+
+    L.circleMarker([s.lat, s.lng], {
+      radius: 5,
+      fillColor: color,
+      color: "#ffffff",
       weight: 1.5,
-      opacity: Math.min(0.15 + count * 0.02, 0.4),
-      fillOpacity: Math.min(0.03 + count * 0.008, 0.12),
+      opacity: 0.9,
+      fillOpacity: 0.8,
+      renderer: canvasRenderer
+    })
+      .bindPopup(createSatellitePopup(s, covered ? bestDist : null))
+      .addTo(layers.satellites);
+  }
+}
+
+function drawSelectedNucleos(nucleos, nucleoStats, selected) {
+  for (let ni = 0; ni < nucleos.length; ni++) {
+    const n = nucleos[ni];
+    const st = nucleoStats[ni];
+    const satCount = st ? st.satIdx.length : 0;
+
+    const isSelected = selected.has(ni);
+    const radius = isSelected ? (8 + Math.min(10, Math.sqrt(satCount + 1))) : 5;
+
+    L.circleMarker([n.lat, n.lng], {
+      radius: radius,
+      fillColor: isSelected ? "#f85149" : "#444c56",
+      color: "#ffffff",
+      weight: isSelected ? 2 : 1,
+      opacity: 1,
+      fillOpacity: isSelected ? 0.95 : 0.6,
+      renderer: canvasRenderer
+    })
+      .bindPopup(createNucleoPopup(n, st, isSelected))
+      .addTo(layers.nucleos);
+  }
+}
+
+function drawSelectedBuffersAndConnections(nucleos, satellites, satCandidates, selected) {
+  // Buffers solo seleccionados
+  selected.forEach((ni) => {
+    const n = nucleos[ni];
+    L.circle([n.lat, n.lng], {
+      radius: BUFFER_RADIUS_M,
+      fillColor: "#58a6ff",
+      color: "#58a6ff",
+      weight: 1,
+      opacity: 0.25,
+      fillOpacity: 0.05,
       interactive: false,
       renderer: canvasRenderer
     }).addTo(layers.buffers);
-  }
-}
+  });
 
-function drawSatellites(satellites) {
-  for (const s of satellites) {
-    const color = s.covered ? '#58a6ff' : '#f85149';
-    const layer = s.covered ? layers.satellites : layers.uncovered;
-    L.circleMarker([s.lat, s.lng], {
-      radius: s.covered ? 5 : 6,
-      fillColor: color,
-      color: s.covered ? '#fff' : '#ff6b6b',
-      weight: s.covered ? 1.5 : 2,
-      fillOpacity: 0.85,
-      renderer: canvasRenderer
-    }).bindPopup(createSatellitePopup(s)).addTo(layer);
-  }
-  layers.uncovered.addTo(map);
-}
+  // Conexiones: cada satélite al núcleo seleccionado más cercano (si existe)
+  for (let si = 0; si < satellites.length; si++) {
+    const s = satellites[si];
+    const cand = satCandidates[si] || [];
 
-function drawNucleos(nucleos) {
-  for (const n of nucleos) {
-    const k = keyLatLng(n.lat, n.lng);
-    const st = nucleoStats.get(k);
-    const count = st ? st.satellites.length : 0;
-    const active = count > 0;
-    L.circleMarker([n.lat, n.lng], {
-      radius: 5 + Math.min(8, Math.sqrt(count + 1) * 1.5),
-      fillColor: active ? '#f85149' : '#6e7681',
-      color: '#fff',
-      weight: 2,
-      fillOpacity: active ? 0.9 : 0.5,
-      renderer: canvasRenderer
-    }).bindPopup(createNucleoPopup(n, st)).addTo(layers.nucleos);
-  }
-}
+    let bestNi = -1;
+    let bestDist = BUFFER_RADIUS_M + 1;
 
-function drawConnections(satellites) {
-  for (const s of satellites) {
-    if (s.covered && s.assignedNucleo) {
-      const n = s.assignedNucleo;
+    for (let c = 0; c < cand.length; c++) {
+      if (selected.has(cand[c].ni) && cand[c].dist < bestDist) {
+        bestDist = cand[c].dist;
+        bestNi = cand[c].ni;
+      }
+    }
+
+    if (bestNi >= 0) {
+      const n = nucleos[bestNi];
+
       L.polyline([[n.lat, n.lng], [s.lat, s.lng]], {
-        color: '#58a6ff',
-        weight: 1,
-        opacity: 0.2,
-        dashArray: '4, 8',
+        color: "#58a6ff",
+        weight: 1.5,
+        opacity: 0.25,
+        dashArray: "5, 10",
         interactive: false,
         renderer: canvasRenderer
       }).addTo(layers.connections);
@@ -357,164 +489,198 @@ function drawConnections(satellites) {
   }
 }
 
-function showOptimizationSuggestions(suggestions) {
-  layers.optimized.clearLayers();
-  for (const sug of suggestions) {
-    L.circleMarker([sug.lat, sug.lng], {
-      radius: 14,
-      fillColor: '#a371f7',
-      color: '#fff',
-      weight: 3,
-      fillOpacity: 0.9
-    }).bindPopup(
-      '<div class="popup-title">💡 Ubicación Sugerida</div>' +
-      '<div class="popup-row"><span class="popup-label">Satélites:</span><span class="popup-value" style="color:#a371f7">' + sug.satellites_count + '</span></div>' +
-      '<div class="popup-row"><span class="popup-label">Estudiantes:</span><span class="popup-value">' + sug.students.toLocaleString() + '</span></div>' +
-      '<div class="popup-row"><span class="popup-label">Prof. necesarios:</span><span class="popup-value">' + sug.profs_needed + '</span></div>' +
-      (sug.nearest_existing ? '<div class="popup-row"><span class="popup-label">Reubicar desde:</span><span class="popup-value">' + escapeHTML(sug.nearest_existing).slice(0,25) + '...</span></div>' : '')
-    ).addTo(layers.optimized);
-
-    L.circle([sug.lat, sug.lng], {
-      radius: CONFIG.BUFFER_RADIUS_M,
-      fillColor: '#a371f7',
-      color: '#a371f7',
-      weight: 2,
-      opacity: 0.4,
-      fillOpacity: 0.06,
-      dashArray: '8, 8',
-      interactive: false
-    }).addTo(layers.optimized);
+// ===== Grid helpers =====
+function buildGridIndex(nucleos) {
+  const grid = new Map();
+  for (let i = 0; i < nucleos.length; i++) {
+    const n = nucleos[i];
+    const k = gridKey(n.lat, n.lng);
+    if (!grid.has(k)) grid.set(k, []);
+    grid.get(k).push(i);
   }
+  return grid;
 }
 
-function optimizarNucleos() {
-  const overlay = document.getElementById('loadingOverlay');
-  const overlayText = overlay?.querySelector('.loading-text');
-  overlay?.classList.remove('hidden');
-  if (overlayText) overlayText.textContent = 'Ejecutando algoritmo K-means...';
+function findNucleosWithin(satellite, nucleos, grid) {
+  const baseKey = gridKey(satellite.lat, satellite.lng);
+  const parts = baseKey.split("|");
+  const gx = Number(parts[0]);
+  const gy = Number(parts[1]);
 
-  setTimeout(() => {
-    if (optimizationData?.suggestions) {
-      showOptimizationSuggestions(optimizationData.suggestions);
-      const total = optimizationData.suggestions.reduce((s, sug) => s + sug.satellites_count, 0);
-      setTimeout(() => {
-        overlay?.classList.add('hidden');
-        alert('📊 Optimización K-means\n\nCobertura: ' + optimizationData.summary.coverage_pct + '%\nSin cobertura: ' + optimizationData.summary.uncovered + '\nSugerencias: ' + optimizationData.suggestions.length + '\nPotencial: +' + total + ' satélites\n\nMarcados en MORADO en el mapa.');
-      }, 500);
-    } else {
-      overlay?.classList.add('hidden');
-      alert('No hay datos de optimización disponibles');
+  const out = [];
+
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      const k = (gx + dx) + "|" + (gy + dy);
+      const idxList = grid.get(k);
+      if (!idxList) continue;
+
+      for (let t = 0; t < idxList.length; t++) {
+        const ni = idxList[t];
+        const n = nucleos[ni];
+        const d = calculateDistance(satellite.lat, satellite.lng, n.lat, n.lng);
+        if (d <= BUFFER_RADIUS_M) out.push({ ni: ni, dist: d });
+      }
     }
-  }, 100);
-}
-
-function createNucleoPopup(nucleo, stats) {
-  const total = stats?.totalStudents || nucleo.students || 0;
-  const count = stats?.satellites.length || 0;
-  const need = Math.ceil(total / CONFIG.PROF_RATIO);
-  const actual = nucleo.profs || 0;
-  const deficit = need - actual;
-  let avgTime = 'N/A';
-  if (stats?.satellites.length > 0) {
-    const t = stats.satellites.reduce((s, sat) => s + (sat.distance / 1000 / CONFIG.AVG_SPEED_KMH * 60), 0);
-    avgTime = (t / stats.satellites.length).toFixed(0) + ' min';
   }
-  return '<div class="popup-title">🏛️ Núcleo DECE</div>' +
-    '<div class="popup-row"><span class="popup-label">Institución:</span><span class="popup-value">' + escapeHTML(nucleo.name).slice(0,40) + '</span></div>' +
-    '<div class="popup-row"><span class="popup-label">Distrito:</span><span class="popup-value">' + escapeHTML(nucleo.dist) + '</span></div>' +
-    '<div class="popup-row"><span class="popup-label">Satélites:</span><span class="popup-value" style="color:#58a6ff">' + count + '</span></div>' +
-    '<div class="popup-row"><span class="popup-label">Estudiantes:</span><span class="popup-value" style="color:#d29922">' + total.toLocaleString() + '</span></div>' +
-    '<div class="popup-row"><span class="popup-label">Prof. necesarios:</span><span class="popup-value">' + need + '</span></div>' +
-    '<div class="popup-row"><span class="popup-label">Prof. actuales:</span><span class="popup-value">' + actual + '</span></div>' +
-    (deficit > 0 ? '<div class="popup-row"><span class="popup-label">Déficit:</span><span class="popup-value" style="color:#f85149">-' + deficit + '</span></div>' : '') +
-    '<div class="popup-row"><span class="popup-label">Tiempo desplaz.:</span><span class="popup-value">' + avgTime + '</span></div>';
+
+  return out;
 }
 
-function createSatellitePopup(sat) {
-  const km = sat.distance ? (sat.distance / 1000).toFixed(2) : 'N/A';
-  const timeMin = sat.distance ? ((sat.distance / 1000) / CONFIG.AVG_SPEED_KMH * 60).toFixed(0) : 'N/A';
-  const timeColor = timeMin !== 'N/A' && parseFloat(timeMin) > CONFIG.MAX_TRAVEL_TIME_MIN ? '#f85149' : '#3fb950';
-  return '<div class="popup-title">📍 Satélite</div>' +
-    '<div class="popup-row"><span class="popup-label">Institución:</span><span class="popup-value">' + escapeHTML(sat.name).slice(0,40) + '</span></div>' +
-    '<div class="popup-row"><span class="popup-label">Distrito:</span><span class="popup-value">' + escapeHTML(sat.dist) + '</span></div>' +
-    '<div class="popup-row"><span class="popup-label">Estado:</span><span class="popup-value" style="color:' + (sat.covered ? '#3fb950' : '#f85149') + '">' + (sat.covered ? '✓ Cubierto' : '✗ Sin cobertura') + '</span></div>' +
-    (sat.covered ? '<div class="popup-row"><span class="popup-label">Distancia:</span><span class="popup-value">' + km + ' km</span></div><div class="popup-row"><span class="popup-label">Tiempo:</span><span class="popup-value" style="color:' + timeColor + '">' + timeMin + ' min</span></div>' : '') +
-    '<div class="popup-row"><span class="popup-label">Estudiantes:</span><span class="popup-value" style="color:#d29922">' + (sat.students || 0).toLocaleString() + '</span></div>';
+function gridKey(lat, lng) {
+  const gx = Math.floor(lat / GRID_CELL_DEG);
+  const gy = Math.floor(lng / GRID_CELL_DEG);
+  return gx + "|" + gy;
+}
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const phi1 = lat1 * Math.PI / 180;
+  const phi2 = lat2 * Math.PI / 180;
+  const dphi = (lat2 - lat1) * Math.PI / 180;
+  const dlambda = (lon2 - lon1) * Math.PI / 180;
+
+  const a =
+    Math.sin(dphi / 2) * Math.sin(dphi / 2) +
+    Math.cos(phi1) * Math.cos(phi2) *
+    Math.sin(dlambda / 2) * Math.sin(dlambda / 2);
+
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+// ===== Popups / UI =====
+function createNucleoPopup(n, st, isSelected) {
+  const satCount = st ? st.satIdx.length : 0;
+  const totalStudents = st ? st.totalStudents : (n.students || 0);
+
+  const profNecesarios = Math.ceil((totalStudents || 0) / 450);
+  const actuales = n.profs || 0;
+  const deficit = profNecesarios - actuales;
+
+  return (
+    '<div class="popup-title">🏛️ Núcleo DECE</div>' +
+    '<div class="popup-content">' +
+      '<div class="popup-row"><span class="popup-label">Institución:</span> <span class="popup-value">' + escapeHTML(n.name) + '</span></div>' +
+      '<div class="popup-row"><span class="popup-label">Distrito:</span> <span class="popup-value">' + escapeHTML(n.dist) + '</span></div>' +
+      '<div class="popup-row"><span class="popup-label">Seleccionado:</span> <span class="popup-value" style="color:' + (isSelected ? "#3fb950" : "#6e7681") + '">' + (isSelected ? "Sí (buffer visible)" : "No (buffer oculto)") + '</span></div>' +
+      '<div class="popup-row"><span class="popup-label">Satélites (closest):</span> <span class="popup-value" style="color:#58a6ff">' + satCount + '</span></div>' +
+      '<div class="popup-row"><span class="popup-label">Estudiantes totales:</span> <span class="popup-value" style="color:#d29922">' + Number(totalStudents || 0).toLocaleString() + '</span></div>' +
+      '<div class="popup-row"><span class="popup-label">Prof. necesarios:</span> <span class="popup-value">' + profNecesarios + '</span></div>' +
+      '<div class="popup-row"><span class="popup-label">Prof. actuales:</span> <span class="popup-value" style="color:' + (deficit > 0 ? "#f85149" : "#3fb950") + '">' + actuales + '</span></div>' +
+      (deficit > 0 ? '<div class="popup-row"><span class="popup-label">Déficit:</span> <span class="popup-value" style="color:#f85149">' + deficit + '</span></div>' : '') +
+    '</div>'
+  );
+}
+
+function createSatellitePopup(s, distMetersOrNull) {
+  const covered = distMetersOrNull !== null;
+  const km = covered ? (distMetersOrNull / 1000).toFixed(2) : "-";
+
+  return (
+    '<div class="popup-title">📍 Satélite</div>' +
+    '<div class="popup-content">' +
+      '<div class="popup-row"><span class="popup-label">Institución:</span> <span class="popup-value">' + escapeHTML(s.name) + '</span></div>' +
+      '<div class="popup-row"><span class="popup-label">Distrito:</span> <span class="popup-value">' + escapeHTML(s.dist) + '</span></div>' +
+      '<div class="popup-row"><span class="popup-label">Estado:</span> <span class="popup-value" style="color:' + (covered ? "#3fb950" : "#f85149") + '">' + (covered ? "✓ Cubierto" : "✗ Sin cobertura") + '</span></div>' +
+      (covered ? '<div class="popup-row"><span class="popup-label">Distancia:</span> <span class="popup-value">' + km + ' km</span></div>' : '') +
+      '<div class="popup-row"><span class="popup-label">Estudiantes:</span> <span class="popup-value" style="color:#d29922">' + Number(s.students || 0).toLocaleString() + '</span></div>' +
+    '</div>'
+  );
 }
 
 function escapeHTML(str) {
-  return String(str ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+  return String(str ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 function updateStatistics(stats) {
-  const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-  setEl('totalNucleos', stats.totalNucleos.toLocaleString());
-  setEl('totalSatellites', stats.totalSatellites.toLocaleString());
-  setEl('nucleosActivos', stats.nucleosActivos.toLocaleString());
-  setEl('sinCobertura', stats.sinCobertura.toLocaleString());
-  setEl('coveragePercent', stats.coveragePercent + '%');
-  setEl('totalStudents', stats.totalStudents.toLocaleString());
-  setEl('profActuales', stats.profActuales.toLocaleString());
-  setEl('profNecesarios', stats.profNecesarios.toLocaleString());
-  const deficit = stats.profNecesarios - stats.profActuales;
-  const deficitEl = document.getElementById('profDeficit');
-  if (deficitEl) {
-    deficitEl.textContent = deficit > 0 ? '-' + deficit.toLocaleString() : '+' + Math.abs(deficit).toLocaleString();
-    deficitEl.style.color = deficit > 0 ? '#f85149' : '#3fb950';
-  }
-  const fill = document.getElementById('coverageFill');
-  if (fill) fill.style.width = stats.coveragePercent + '%';
-  const avgTimeEl = document.getElementById('avgTravelTime');
-  if (avgTimeEl && stats.avgTravelTime) avgTimeEl.textContent = stats.avgTravelTime + ' min';
+  const elN = document.getElementById("totalNucleos");
+  const elS = document.getElementById("totalSatellites");
+  const elC = document.getElementById("coveragePercent");
+  const elT = document.getElementById("totalStudents");
+
+  if (elN) elN.textContent = Number(stats.totalNucleos || 0).toLocaleString();
+  if (elS) elS.textContent = Number(stats.totalSatellites || 0).toLocaleString();
+  if (elC) elC.textContent = (stats.coveragePercent ?? "0.0") + "%";
+  if (elT) elT.textContent = Number(stats.totalStudents || 0).toLocaleString();
 }
 
-function updateTopNucleos(nucleoStats) {
-  const container = document.getElementById('topNucleos');
+function updateTopNucleosFromStats(nucleoStats) {
+  const container = document.getElementById("topNucleos");
   if (!container) return;
-  const sorted = Array.from(nucleoStats.values()).sort((a, b) => b.satellites.length - a.satellites.length).slice(0, 10);
-  container.innerHTML = sorted.map((s, i) => {
-    const profNec = Math.ceil((s.totalStudents || 0) / CONFIG.PROF_RATIO);
-    const avgTime = s.satellites.length > 0 ? (s.satellites.reduce((sum, sat) => sum + (sat.distance || 0), 0) / s.satellites.length / 1000 / CONFIG.AVG_SPEED_KMH * 60).toFixed(0) : 0;
-    return '<div class="top-item" onclick="flyTo(' + s.nucleo.lat + ',' + s.nucleo.lng + ')">' +
-      '<div class="top-item-header"><span class="top-rank">#' + (i + 1) + '</span><span class="top-name">' + escapeHTML(s.nucleo.name) + '</span><span class="top-count">' + s.satellites.length + '</span></div>' +
-      '<div class="top-desc">' + s.totalStudents.toLocaleString() + ' est. • ' + profNec + ' prof. • ~' + avgTime + ' min</div></div>';
-  }).join('');
+
+  const sorted = nucleoStats
+    .map((st, i) => ({ st: st, i: i }))
+    .sort((a, b) => b.st.satIdx.length - a.st.satIdx.length)
+    .slice(0, 10);
+
+  container.innerHTML = sorted.map((x, idx) => {
+    const st = x.st;
+    const n = st.nucleo;
+    const profNecesarios = Math.ceil((st.totalStudents || 0) / 450);
+
+    return (
+      '<div class="top-item" onclick="flyToLocation(' + n.lat + ',' + n.lng + ')">' +
+        '<div class="top-item-header">' +
+          '<span class="top-rank">#' + (idx + 1) + '</span>' +
+          '<span class="top-name">' + escapeHTML(n.name) + '</span>' +
+          '<span class="top-count">' + st.satIdx.length + '</span>' +
+        '</div>' +
+        '<div class="top-desc">' + Number(st.totalStudents || 0).toLocaleString() + ' estudiantes • ' + profNecesarios + ' prof. necesarios</div>' +
+      '</div>'
+    );
+  }).join("");
 }
 
-function flyTo(lat, lng) { map.flyTo([lat, lng], 13, { duration: 1 }); }
+function flyToLocation(lat, lng) {
+  map.flyTo([lat, lng], 12, { duration: 1.2 });
+}
 
+// ===== Controles =====
 function setupControls() {
-  const byId = id => document.getElementById(id);
-  byId('toggleStats')?.addEventListener('click', () => { byId('statsPanel')?.classList.toggle('active'); byId('legendPanel')?.classList.remove('active'); });
-  byId('toggleLegend')?.addEventListener('click', () => { byId('legendPanel')?.classList.toggle('active'); byId('statsPanel')?.classList.remove('active'); });
-  byId('btnOptimizar')?.addEventListener('click', optimizarNucleos);
-  bindLayerToggle('toggleNucleos', layers.nucleos);
-  bindLayerToggle('toggleSatellites', layers.satellites);
-  bindLayerToggle('toggleBuffers', layers.buffers);
-  bindLayerToggle('toggleConnections', layers.connections);
-  bindLayerToggle('toggleUncovered', layers.uncovered);
-  bindLayerToggle('toggleSuggestions', layers.optimized);
-  byId('toggleViasPrincipales')?.addEventListener('change', e => {
-    if (e.target.checked && viasData) {
-      const vl = L.geoJSON(viasData, {
-        style: f => {
-          const hw = f.properties?.highway || '';
-          const p = ['primary', 'trunk', 'motorway'].includes(hw);
-          return { color: p ? '#f0883e' : '#d29922', weight: p ? 2 : 1.2, opacity: p ? 0.7 : 0.4 };
-        },
-        interactive: false
-      });
-      layers.vias.addLayer(vl);
-      map.addLayer(layers.vias);
-    } else {
-      map.removeLayer(layers.vias);
-      layers.vias.clearLayers();
-    }
-  });
+  const byId = (id) => document.getElementById(id);
+
+  const statsBtn = byId("toggleStats");
+  const legendBtn = byId("toggleLegend");
+
+  if (statsBtn) {
+    statsBtn.addEventListener("click", () => {
+      const sp = byId("statsPanel");
+      const lp = byId("legendPanel");
+      if (sp) sp.classList.toggle("active");
+      if (lp) lp.classList.remove("active");
+    });
+  }
+
+  if (legendBtn) {
+    legendBtn.addEventListener("click", () => {
+      const lp = byId("legendPanel");
+      const sp = byId("statsPanel");
+      if (lp) lp.classList.toggle("active");
+      if (sp) sp.classList.remove("active");
+    });
+  }
+
+  bindLayerToggle("toggleBuffers", layers.buffers);
+  bindLayerToggle("toggleConnections", layers.connections);
+  bindLayerToggle("toggleNucleos", layers.nucleos);
+  bindLayerToggle("toggleSatellites", layers.satellites);
+
+  setTimeout(() => {
+    const sp = byId("statsPanel");
+    if (sp) sp.classList.add("active");
+  }, 500);
 }
 
 function bindLayerToggle(id, layer) {
-  document.getElementById(id)?.addEventListener('change', e => {
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  el.addEventListener("change", (e) => {
     if (e.target.checked) map.addLayer(layer);
     else map.removeLayer(layer);
   });
