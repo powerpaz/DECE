@@ -111,61 +111,8 @@
 
                 <div class="divider"></div>
 
-                <!-- Criterios DECE -->
-                <h3 class="section-title">📋 Criterios Modelo DECE</h3>
-                <div class="criteria-box">
-                    <div class="criteria-item">
-                        <span class="criteria-icon">📏</span>
-                        <span class="criteria-text">Distancia máx: <strong>7.5 km</strong></span>
-                    </div>
-                    <div class="criteria-item">
-                        <span class="criteria-icon">👨‍🏫</span>
-                        <span class="criteria-text">Razón: <strong>1 prof / 450 estudiantes</strong></span>
-                    </div>
-                    <div class="criteria-item">
-                        <span class="criteria-icon">🚌</span>
-                        <span class="criteria-text">Tiempo desplazamiento: <strong>≤ 1 hora</strong></span>
-                    </div>
-                    <div class="criteria-item">
-                        <span class="criteria-icon">🛣️</span>
-                        <span class="criteria-text">Acceso vial requerido</span>
-                    </div>
-                </div>
-
-                <div class="divider"></div>
-
-                <!-- Déficit de profesionales -->
-                <h3 class="section-title">⚡ Análisis de Profesionales</h3>
-                <div class="prof-analysis">
-                    <div class="prof-row">
-                        <span>Profesionales actuales:</span>
-                        <span class="prof-value" id="profActuales">-</span>
-                    </div>
-                    <div class="prof-row">
-                        <span>Profesionales necesarios:</span>
-                        <span class="prof-value" id="profNecesarios">-</span>
-                    </div>
-                    <div class="prof-row deficit">
-                        <span>Déficit:</span>
-                        <span class="prof-value" id="profDeficit">-</span>
-                    </div>
-                </div>
-
-                <div class="divider"></div>
-
                 <h3 class="section-title">🏆 Top 10 Núcleos (Absorción)</h3>
                 <div id="topNucleos" class="top-list"></div>
-
-                <div class="divider"></div>
-
-                <!-- Tiempo de desplazamiento -->
-                <div class="travel-stat">
-                    <div class="travel-icon">🚌</div>
-                    <div class="travel-info">
-                        <div class="travel-value" id="avgTravelTime">-</div>
-                        <div class="travel-label">Tiempo Prom. Desplazamiento</div>
-                    </div>
-                </div>
 
                 <div class="divider"></div>
 
@@ -177,11 +124,7 @@
                     </label>
                     <label class="toggle-row">
                         <input type="checkbox" id="toggleSatellites" checked>
-                        <span>Satélites Cubiertos</span>
-                    </label>
-                    <label class="toggle-row">
-                        <input type="checkbox" id="toggleUncovered" checked>
-                        <span>Satélites Sin Cobertura</span>
+                        <span>Satélites</span>
                     </label>
                     <label class="toggle-row">
                         <input type="checkbox" id="toggleBuffers" checked>
@@ -190,14 +133,6 @@
                     <label class="toggle-row">
                         <input type="checkbox" id="toggleConnections" checked>
                         <span>Conexiones</span>
-                    </label>
-                    <label class="toggle-row">
-                        <input type="checkbox" id="toggleSuggestions" checked>
-                        <span>Sugerencias K-means</span>
-                    </label>
-                    <label class="toggle-row">
-                        <input type="checkbox" id="toggleViasPrincipales">
-                        <span>Vías Principales</span>
                     </label>
                 </div>
             </div>
@@ -218,27 +153,7 @@
                     </div>
                     <div class="legend-item">
                         <span class="legend-dot sat-covered-dot"></span>
-                        <span>Satélite cubierto (COD 2)</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-dot sat-uncovered-dot"></span>
-                        <span>Satélite sin cobertura</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-dot optimized-dot"></span>
-                        <span>Núcleo optimizado (sugerido)</span>
-                    </div>
-                </div>
-
-                <div class="legend-section">
-                    <div class="legend-title">Vías</div>
-                    <div class="legend-item">
-                        <span class="legend-line via-principal"></span>
-                        <span>Vía Principal</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-line via-secundaria"></span>
-                        <span>Vía Secundaria</span>
+                        <span>Satélite (COD 2)</span>
                     </div>
                 </div>
 
@@ -246,15 +161,9 @@
                     <div class="legend-title">Cobertura</div>
                     <div class="legend-item">
                         <span class="legend-circle buffer-legend"></span>
-                        <span>Buffer 7.5 km</span>
+                        <span>Buffer 7.5 km (solo núcleos necesarios)</span>
                     </div>
                 </div>
-
-                <div class="divider"></div>
-                <p class="legend-note">
-                    <strong>Nota:</strong> El algoritmo de optimización sugiere reubicaciones 
-                    de núcleos para maximizar la cobertura de instituciones satélite.
-                </p>
             </div>
         </div>
 
@@ -268,7 +177,7 @@
 
     <!-- Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
