@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análisis de Cobertura DECE - Ecuador</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Barra Superior -->
+    <div class="topbar">
+        <div class="topbar-left">
+            <div class="logo">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="currentColor" opacity="0.8"/>
+                    <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                <span>Análisis DECE</span>
+            </div>
+        </div>
+        <div class="topbar-center">
+            <h1 class="topbar-title">Cobertura de Departamentos de Consejería Estudiantil</h1>
+        </div>
+        <div class="topbar-right">
+            <button class="btn-icon" id="toggleStats" title="Estadísticas">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="7" height="7" rx="1"/>
+                    <rect x="14" y="3" width="7" height="7" rx="1"/>
+                    <rect x="14" y="14" width="7" height="7" rx="1"/>
+                    <rect x="3" y="14" width="7" height="7" rx="1"/>
+                </svg>
+            </button>
+            <button class="btn-icon" id="toggleLegend" title="Leyenda">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 16v-4M12 8h.01"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Contenedor Principal -->
+    <div class="container">
+        <!-- Mapa -->
+        <div id="map" class="map"></div>
+
+        <!-- Panel de Estadísticas -->
+        <div class="panel panel-left" id="statsPanel">
+            <div class="panel-header">
+                <h2>Estadísticas de Cobertura</h2>
+                <button class="panel-close" onclick="document.getElementById('statsPanel').classList.remove('active')">×</button>
+            </div>
+            <div class="panel-content">
+                <div class="stats-grid">
+                    <div class="stat-box stat-nucleo">
+                        <div class="stat-icon">🏛️</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="totalNucleos">-</div>
+                            <div class="stat-label">Núcleos DECE</div>
+                        </div>
+                    </div>
+                    <div class="stat-box stat-satellite">
+                        <div class="stat-icon">📍</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="totalSatellites">-</div>
+                            <div class="stat-label">Satellites</div>
+                        </div>
+                    </div>
+                    <div class="stat-box stat-coverage">
+                        <div class="stat-icon">✓</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="coveragePercent">-</div>
+                            <div class="stat-label">Cobertura</div>
+                        </div>
+                    </div>
+                    <div class="stat-box stat-students">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="totalStudents">-</div>
+                            <div class="stat-label">Estudiantes</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <h3 class="section-title">Top 10 Núcleos con Más Satellites</h3>
+                <div class="top-list" id="topNucleos">
+                    <div class="loading">Cargando datos...</div>
+                </div>
+
+                <div class="divider"></div>
+
+                <h3 class="section-title">Criterios de Cobertura</h3>
+                <div class="criteria-list">
+                    <div class="criteria-item">
+                        <span class="criteria-bullet">•</span>
+                        <span>Distancia máxima: <strong>7.5 km</strong></span>
+                    </div>
+                    <div class="criteria-item">
+                        <span class="criteria-bullet">•</span>
+                        <span>Tiempo de desplazamiento: <strong>≤ 1 hora</strong></span>
+                    </div>
+                    <div class="criteria-item">
+                        <span class="criteria-bullet">•</span>
+                        <span>Razón estudiantes/profesional: <strong>1:450</strong></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel de Leyenda -->
+        <div class="panel panel-right" id="legendPanel">
+            <div class="panel-header">
+                <h2>Leyenda</h2>
+                <button class="panel-close" onclick="document.getElementById('legendPanel').classList.remove('active')">×</button>
+            </div>
+            <div class="panel-content">
+                <div class="legend-section">
+                    <h3 class="legend-title">Tipos de Instituciones</h3>
+                    <div class="legend-items">
+                        <div class="legend-item">
+                            <div class="legend-symbol nucleo-symbol"></div>
+                            <div class="legend-text">
+                                <div class="legend-name">Núcleo DECE</div>
+                                <div class="legend-desc">COD_GDECE: 3, 4, 5</div>
+                            </div>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-symbol satellite-connected-symbol"></div>
+                            <div class="legend-text">
+                                <div class="legend-name">Satellite Conectado</div>
+                                <div class="legend-desc">COD_GDECE: 2 (≤7.5 km)</div>
+                            </div>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-symbol satellite-isolated-symbol"></div>
+                            <div class="legend-text">
+                                <div class="legend-name">Satellite Aislado</div>
+                                <div class="legend-desc">COD_GDECE: 2 (>7.5 km)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="legend-section">
+                    <h3 class="legend-title">Elementos del Mapa</h3>
+                    <div class="legend-items">
+                        <div class="legend-item">
+                            <div class="legend-symbol buffer-symbol"></div>
+                            <div class="legend-text">
+                                <div class="legend-name">Buffer 7.5 km</div>
+                                <div class="legend-desc">Área de cobertura del núcleo</div>
+                            </div>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-symbol line-symbol"></div>
+                            <div class="legend-text">
+                                <div class="legend-name">Conexión</div>
+                                <div class="legend-desc">Núcleo → Satellite</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="layer-controls">
+                    <h3 class="legend-title">Capas del Mapa</h3>
+                    <label class="toggle-label">
+                        <input type="checkbox" id="toggleBuffers" checked>
+                        <span>Mostrar Buffers</span>
+                    </label>
+                    <label class="toggle-label">
+                        <input type="checkbox" id="toggleConnections" checked>
+                        <span>Mostrar Conexiones</span>
+                    </label>
+                    <label class="toggle-label">
+                        <input type="checkbox" id="toggleNucleos" checked>
+                        <span>Mostrar Núcleos</span>
+                    </label>
+                    <label class="toggle-label">
+                        <input type="checkbox" id="toggleSatellites" checked>
+                        <span>Mostrar Satellites</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Overlay de Carga -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Cargando datos geoespaciales...</div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Datos de ejemplo - REEMPLAZAR CON TUS DATOS REALES -->
+    <script src="dece_data.js"></script>
+    
+    <!-- Aplicación Principal -->
+    <script src="app.js"></script>
+</body>
+</html>
