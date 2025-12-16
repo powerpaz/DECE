@@ -1,40 +1,57 @@
 /*************************************************
- * DECE Coverage App (Leaflet + CSV) - v4.1
- * Objetivo: dejar SOLO buffers "necesarios" cubriendo 95–98% de satélites
+ * DECE Coverage App (Leaflet + CSV) - v4.3
+ * Objetivo: dejar SOLO buffers “necesarios” cubriendo 95–98% de satélites
  *
- * - CSV robusto (delimiter ';' + BOM)
- * - Detecta columnas por encabezado
- * - Grid index para acelerar búsqueda dentro de 7.5 km
- * - Selección de buffers: Set Cover Greedy (policy='cover')
- * - Dibujo: satélites siempre; buffers + conexiones solo de núcleos seleccionados
+ * ✅ CSV robusto:
+ *   - delimiter ';' (y fallback automático si viene con ',')
+ *   - soporta coma decimal (ej: -2,893852)
+ *   - quita BOM
+ * ✅ Rendimiento:
+ *   - preferCanvas + indexación por grilla
+ * ✅ Limpieza:
+ *   - Set Cover Greedy (policy='cover') para seleccionar núcleos mínimos
+ * ✅ “Tipo redes”:
+ *   - animación ligera de conexiones (dashOffset)
+ *   - resalta/pulsa top núcleos seleccionados (sin matar rendimiento)
  *************************************************/
 
 let map;
 
 const layers = {
-  nucleos: L.featureGroup(),         // canvas
-  satellites: L.featureGroup(),      // canvas
-  buffers: L.featureGroup(),         // canvas (solo seleccionados)
-  connections: L.featureGroup()      // canvas (solo seleccionados)
+  nucleos: L.featureGroup(),
+  satellites: L.featureGroup(),
+  buffers: L.featureGroup(),
+  connections: L.featureGroup()
 };
 
 // ===== Parámetros base =====
 const BUFFER_RADIUS_M = 7500;
 const ECUADOR_CENTER = [-1.831239, -78.183406];
-
 const canvasRenderer = L.canvas({ padding: 0.5 });
 
-// Grid en grados ~ 0.10° ≈ 11 km
+// Grid (grados). 0.10° ≈ 11 km aprox.
 const GRID_CELL_DEG = 0.10;
 
-// ===== Política de “buffers necesarios” (95–98%) =====
+// ===== Política “buffers necesarios” =====
 const BUFFER_SELECTION_POLICY = "cover"; // 'cover' | 'used' | 'top'
-const TARGET_COVERAGE = 0.97;            // ✅ 0.95–0.98 (default 0.97)
-const MAX_BUFFERS = 220;                 // ✅ baja saturación (180–300)
-const MIN_SATS_PER_BUFFER = 3;           // ✅ elimina ruido (sube/baja según densidad)
+const TARGET_COVERAGE = 0.97;            // 0.95–0.98 recomendado
+const MAX_BUFFERS = 220;                 // 180–300
+const MIN_SATS_PER_BUFFER = 3;           // 2–6 (sube = más limpio)
 const TOP_N_BUFFERS = 120;               // solo si policy='top'
 
+// ===== “Tipo redes” (animación ligera) =====
+const ENABLE_NETWORK_ANIMATION = true;
+const ENABLE_NUCLEO_PULSE = true;
+const MAX_CONNECTIONS_FOR_ANIM = 6000;   // si tienes más, se apaga para no freír el navegador
+
+// ===== Estimación de tiempo =====
+const ASSUMED_SPEED_KMH = 30; // velocidad “promedio” transporte regular (ajústalo)
+
+// Estado interno
 let _initialized = false;
+let _connectionAnimTimer = null;
+let _pulseTimer = null;
+let _pulsePhase = 0;
 
 document.addEventListener("DOMContentLoaded", () => {
   if (_initialized) return;
@@ -45,7 +62,9 @@ document.addEventListener("DOMContentLoaded", () => {
   loadCSV();
 });
 
-// ===== Mapa =====
+/* =========================
+   MAPA
+========================= */
 function initMap() {
   map = L.map("map", {
     center: ECUADOR_CENTER,
@@ -75,7 +94,9 @@ function initMap() {
   Object.values(layers).forEach(layer => layer.addTo(map));
 }
 
-// ===== CSV =====
+/* =========================
+   CSV
+========================= */
 function loadCSV() {
   const overlay = document.getElementById("loadingOverlay");
   const overlayText = overlay ? overlay.querySelector(".loading-text") : null;
@@ -88,45 +109,84 @@ function loadCSV() {
 
   if (overlayText) overlayText.textContent = "Cargando CSV…";
 
-  Papa.parse("DECE_CRUCE_X_Y_NUC_SAT.csv", {
-    download: true,
-    delimiter: ";",
-    skipEmptyLines: "greedy",
-    worker: true,
-    beforeFirstChunk: (chunk) => chunk.replace(/^\uFEFF/, ""),
-    complete: (results) => {
-      const rows = results.data || [];
-      if (!rows.length) {
-        if (overlayText) overlayText.textContent = "CSV vacío o no se pudo leer.";
-        return;
-      }
-
-      if (overlayText) overlayText.textContent = "Preparando columnas…";
-
-      const resolved = resolveColumnIndexes(rows[0] || []);
-      const idx = resolved.idx;
-      if (resolved.issues.length) console.warn("Column issues:", resolved.issues);
-
-      const mapped = mapRowsToData(rows, idx);
-      const data = mapped.data;
-      const bounds = mapped.bounds;
-
-      if (!data.length) {
-        if (overlayText) overlayText.textContent = "No hay registros válidos (revisa LAT/LON y COD_GDECE).";
-        return;
-      }
-
-      if (bounds && bounds.isValid()) {
-        map.fitBounds(bounds.pad(0.10), { animate: false });
-      }
-
-      processData(data);
-    },
-    error: (err) => {
-      console.error(err);
-      if (overlayText) overlayText.textContent = "Error al descargar CSV (ver consola / Network).";
-    }
+  // Intento 1: delimiter ';'
+  parseWithDelimiter(";", (ok, results) => {
+    if (ok) return handleParsed(results);
+    // Intento 2: delimiter ','
+    parseWithDelimiter(",", (ok2, results2) => {
+      if (ok2) return handleParsed(results2);
+      if (overlayText) overlayText.textContent = "Error leyendo CSV (delimiter). Revisa el archivo.";
+    });
   });
+
+  function parseWithDelimiter(delim, cb) {
+    Papa.parse("DECE_CRUCE_X_Y_NUC_SAT.csv", {
+      download: true,
+      delimiter: delim,
+      skipEmptyLines: "greedy",
+      worker: true,
+      beforeFirstChunk: (chunk) => chunk.replace(/^\uFEFF/, ""),
+      complete: (results) => {
+        const rows = results.data || [];
+        // Validación mínima: header + al menos 1 fila y que tenga varias columnas
+        const ok = rows.length > 1 && Array.isArray(rows[0]) && rows[0].length >= 3;
+        cb(ok, results);
+      },
+      error: (err) => {
+        console.error(err);
+        cb(false, null);
+      }
+    });
+  }
+
+  function handleParsed(results) {
+    const rows = results.data || [];
+    if (!rows.length) {
+      if (overlayText) overlayText.textContent = "CSV vacío o no se pudo leer.";
+      return;
+    }
+
+    if (overlayText) overlayText.textContent = "Preparando columnas…";
+
+    const resolved = resolveColumnIndexes(rows[0] || []);
+    const idx = resolved.idx;
+    if (resolved.issues.length) console.warn("Column issues:", resolved.issues);
+
+    const mapped = mapRowsToData(rows, idx);
+    const data = mapped.data;
+    const bounds = mapped.bounds;
+
+    if (!data.length) {
+      if (overlayText) overlayText.textContent = "No hay registros válidos (revisa LAT/LON y COD_GDECE).";
+      return;
+    }
+
+    if (bounds && bounds.isValid()) {
+      map.fitBounds(bounds.pad(0.10), { animate: false });
+    }
+
+    processData(data);
+  }
+}
+
+// Normaliza número con coma decimal / miles
+function parseNumberES(v) {
+  if (v === null || v === undefined) return NaN;
+  let s = String(v).trim();
+  if (!s) return NaN;
+
+  // quita espacios y caracteres raros comunes
+  s = s.replace(/\s+/g, "");
+
+  // 1.234,56 -> 1234.56
+  if (s.includes(",") && s.includes(".")) {
+    s = s.replace(/\./g, "").replace(",", ".");
+  } else if (s.includes(",") && !s.includes(".")) {
+    // -2,893 -> -2.893
+    s = s.replace(",", ".");
+  }
+
+  return parseFloat(s);
 }
 
 // Detecta columnas por encabezado
@@ -146,12 +206,12 @@ function resolveColumnIndexes(headerRow) {
   const idx = {
     lat: findOne(["latitud", "lat", "latitude"]),
     lng: findOne(["longitud", "lon", "lng", "longitude"]),
-    cod: findOne(["cod_gdece", "cod gdece"]),
-    name: findOne(["nombre_institución", "nombre_institucion", "nombre", "Nombre_Institución"]),
-    dist: findOne(["distrito"]),
+    cod: findOne(["cod_gdece", "cod gdece", "codgdece"]),
+    name: findOne(["nombre_institución", "nombre_institucion", "nombre", "nombre ie"]),
+    dist: findOne(["distrito", "dirección distrital", "direccion distrital"]),
     zone: findOne(["zona"]),
-    students: findOne(["total estudiantes", "total_estudiantes", "TOTAL ESTUDIANTES"]),
-    profs: findOne(["po_profdece", "PO_ProfDECE", "profdece", "profesionales"])
+    students: findOne(["total estudiantes", "total_estudiantes", "total_estudiante", "matricula", "estudiantes"]),
+    profs: findOne(["po_profdece", "profdece", "profesionales", "profesional", "num_prof"])
   };
 
   const issues = [];
@@ -170,22 +230,22 @@ function mapRowsToData(rows, idx) {
     const r = rows[i];
     if (!Array.isArray(r)) continue;
 
-    const lat = parseFloat(r[idx.lat]);
-    const lng = parseFloat(r[idx.lng]);
-    const cod = Number(r[idx.cod]);
+    const lat = parseNumberES(r[idx.lat]);
+    const lng = parseNumberES(r[idx.lng]);
+    const cod = Number(String(r[idx.cod] ?? "").trim());
 
     if (Number.isNaN(lat) || Number.isNaN(lng)) continue;
-    if ([2, 3, 4, 5].indexOf(cod) === -1) continue; // ignora 1
+    if ([2, 3, 4, 5].indexOf(cod) === -1) continue; // ignora cod=1
 
     const item = {
-      lat: lat,
-      lng: lng,
-      cod: cod,
+      lat,
+      lng,
+      cod,
       name: idx.name >= 0 ? (r[idx.name] || "IE sin nombre") : "IE sin nombre",
       dist: idx.dist >= 0 ? (r[idx.dist] || "N/D") : "N/D",
       zone: idx.zone >= 0 ? (r[idx.zone] || "N/D") : "N/D",
-      students: idx.students >= 0 ? (Number(r[idx.students]) || 0) : 0,
-      profs: idx.profs >= 0 ? (Number(r[idx.profs]) || 0) : 0
+      students: idx.students >= 0 ? (parseNumberES(r[idx.students]) || 0) : 0,
+      profs: idx.profs >= 0 ? (parseNumberES(r[idx.profs]) || 0) : 0
     };
 
     data.push(item);
@@ -195,9 +255,11 @@ function mapRowsToData(rows, idx) {
   return { data, bounds };
 }
 
-// ===== Core =====
+/* =========================
+   CORE
+========================= */
 function processData(data) {
-  // Limpia capas
+  stopAnimations();
   Object.values(layers).forEach(l => l.clearLayers());
 
   const overlay = document.getElementById("loadingOverlay");
@@ -214,24 +276,25 @@ function processData(data) {
   if (overlayText) overlayText.textContent = "Indexando núcleos…";
   const nucleoGrid = buildGridIndex(nucleos);
 
-  // satCandidates[si] = [{ni, dist}, ...] (núcleos dentro de 7.5km)
   if (overlayText) overlayText.textContent = "Calculando coberturas…";
   const satCandidates = new Array(satellites.length);
 
-  // Stats por núcleo (por índice)
+  // Stats por núcleo (closest assignment, útil para “Top 10” y métricas)
   const nucleoStats = nucleos.map(n => ({
     nucleo: n,
     satIdx: [],
     totalStudents: n.students || 0
   }));
 
-  // Construir candidates + closest (para stats)
+  // Para promedio de distancia/tiempo (solo por closest dentro de buffer, luego filtramos por selected)
+  const closestForSat = new Array(satellites.length).fill(null);
+
   for (let si = 0; si < satellites.length; si++) {
     const s = satellites[si];
     const candidates = findNucleosWithin(s, nucleos, nucleoGrid);
     satCandidates[si] = candidates;
 
-    // closest para stats (no define buffers)
+    // closest (sin selección todavía)
     let bestNi = -1;
     let bestDist = BUFFER_RADIUS_M + 1;
     for (let c = 0; c < candidates.length; c++) {
@@ -243,45 +306,73 @@ function processData(data) {
     if (bestNi >= 0) {
       nucleoStats[bestNi].satIdx.push(si);
       nucleoStats[bestNi].totalStudents += (s.students || 0);
+      closestForSat[si] = { ni: bestNi, dist: bestDist };
     }
   }
 
-  // Selección de núcleos “necesarios” para buffers/conexiones
   if (overlayText) overlayText.textContent = "Seleccionando buffers necesarios (cover)…";
   const selected = selectNeededNucleos({
     policy: BUFFER_SELECTION_POLICY,
-    nucleos: nucleos,
-    satellites: satellites,
-    nucleoStats: nucleoStats,
-    satCandidates: satCandidates
+    nucleos,
+    satellites,
+    nucleoStats,
+    satCandidates
   });
 
-  // Dibujar: satélites siempre, núcleos siempre (pero seleccionados resaltados),
-  // buffers + conexiones solo seleccionados
   if (overlayText) overlayText.textContent = "Dibujando mapa (limpio)…";
+  const drawRefs = {
+    nucleoLayers: new Map(), // ni -> circleMarker layer (para pulso)
+    connectionLayers: []     // para animación
+  };
 
   drawAllSatellites(satellites, selected, satCandidates);
-  drawSelectedNucleos(nucleos, nucleoStats, selected);
-  drawSelectedBuffersAndConnections(nucleos, satellites, satCandidates, selected);
+  drawSelectedNucleos(nucleos, nucleoStats, selected, drawRefs);
+  const connectionCount = drawSelectedBuffersAndConnections(nucleos, satellites, satCandidates, selected, drawRefs);
 
   const coveredBySelected = countCoveredBySelected(satCandidates, selected);
+  const uncovered = satellites.length - coveredBySelected;
   const coveragePercent = satellites.length
     ? ((coveredBySelected / satellites.length) * 100).toFixed(1)
     : "0.0";
 
+  // Profesionales: totales “ideales” según estudiantes totales
+  const totalStudents = data.reduce((sum, d) => sum + (d.students || 0), 0);
+  const profNecesarios = Math.ceil(totalStudents / 450);
+  const profActuales = nucleos.reduce((sum, n) => sum + (n.profs || 0), 0);
+  const profDeficit = profNecesarios - profActuales;
+
+  // Tiempo promedio estimado SOLO de satélites cubiertos por selected
+  const avgMin = estimateAvgTravelMinutes(nucleos, satellites, satCandidates, selected);
+
   updateStatistics({
     totalNucleos: nucleos.length,
+    nucleosActivos: selected.size,
     totalSatellites: satellites.length,
-    coveragePercent: coveragePercent,
-    totalStudents: data.reduce((sum, d) => sum + (d.students || 0), 0)
+    sinCobertura: uncovered,
+    coveragePercent,
+    totalStudents,
+    profActuales,
+    profNecesarios,
+    profDeficit,
+    avgTravelMin: avgMin
   });
 
   updateTopNucleosFromStats(nucleoStats);
 
+  // Animaciones “tipo redes” (seguras)
+  if (ENABLE_NETWORK_ANIMATION && connectionCount > 0 && connectionCount <= MAX_CONNECTIONS_FOR_ANIM) {
+    startConnectionAnimation(drawRefs.connectionLayers);
+  }
+  if (ENABLE_NUCLEO_PULSE) {
+    startNucleoPulse(drawRefs.nucleoLayers, nucleos, nucleoStats, selected);
+  }
+
   if (overlay) overlay.classList.add("hidden");
 }
 
-// ===== Selección de “buffers necesarios” =====
+/* =========================
+   SELECCIÓN “BUFFERS NECESARIOS”
+========================= */
 function selectNeededNucleos(args) {
   const policy = args.policy;
   const nucleos = args.nucleos;
@@ -293,7 +384,7 @@ function selectNeededNucleos(args) {
 
   if (policy === "top") {
     const order = nucleoStats
-      .map((st, i) => ({ i: i, k: st.satIdx.length }))
+      .map((st, i) => ({ i, k: st.satIdx.length }))
       .sort((a, b) => b.k - a.k)
       .slice(0, TOP_N_BUFFERS)
       .filter(x => x.k >= MIN_SATS_PER_BUFFER)
@@ -317,11 +408,10 @@ function selectNeededNucleos(args) {
   const total = satellites.length;
   const target = Math.ceil(total * TARGET_COVERAGE);
 
-  const uncovered = new Array(total);
-  for (let i = 0; i < total; i++) uncovered[i] = true;
+  const uncovered = new Array(total).fill(true);
   let uncoveredCount = total;
 
-  // coverSets[ni] = [si, si, ...] satélites dentro del buffer del núcleo ni
+  // coverSets[ni] = [si,...] satélites dentro del buffer del núcleo ni
   const coverSets = new Array(nucleos.length);
   for (let ni = 0; ni < nucleos.length; ni++) coverSets[ni] = [];
 
@@ -387,12 +477,13 @@ function countCoveredBySelected(satCandidates, selected) {
   return covered;
 }
 
-// ===== Dibujo =====
+/* =========================
+   DIBUJO
+========================= */
 function drawAllSatellites(satellites, selected, satCandidates) {
   for (let si = 0; si < satellites.length; si++) {
     const s = satellites[si];
 
-    // cubierto si existe algún núcleo seleccionado dentro de 7.5 km
     let covered = false;
     let bestDist = BUFFER_RADIUS_M + 1;
 
@@ -412,7 +503,7 @@ function drawAllSatellites(satellites, selected, satCandidates) {
       color: "#ffffff",
       weight: 1.5,
       opacity: 0.9,
-      fillOpacity: 0.8,
+      fillOpacity: 0.85,
       renderer: canvasRenderer
     })
       .bindPopup(createSatellitePopup(s, covered ? bestDist : null))
@@ -420,7 +511,7 @@ function drawAllSatellites(satellites, selected, satCandidates) {
   }
 }
 
-function drawSelectedNucleos(nucleos, nucleoStats, selected) {
+function drawSelectedNucleos(nucleos, nucleoStats, selected, drawRefs) {
   for (let ni = 0; ni < nucleos.length; ni++) {
     const n = nucleos[ni];
     const st = nucleoStats[ni];
@@ -429,8 +520,8 @@ function drawSelectedNucleos(nucleos, nucleoStats, selected) {
     const isSelected = selected.has(ni);
     const radius = isSelected ? (8 + Math.min(10, Math.sqrt(satCount + 1))) : 5;
 
-    L.circleMarker([n.lat, n.lng], {
-      radius: radius,
+    const layer = L.circleMarker([n.lat, n.lng], {
+      radius,
       fillColor: isSelected ? "#f85149" : "#444c56",
       color: "#ffffff",
       weight: isSelected ? 2 : 1,
@@ -440,10 +531,12 @@ function drawSelectedNucleos(nucleos, nucleoStats, selected) {
     })
       .bindPopup(createNucleoPopup(n, st, isSelected))
       .addTo(layers.nucleos);
+
+    drawRefs.nucleoLayers.set(ni, layer);
   }
 }
 
-function drawSelectedBuffersAndConnections(nucleos, satellites, satCandidates, selected) {
+function drawSelectedBuffersAndConnections(nucleos, satellites, satCandidates, selected, drawRefs) {
   // Buffers solo seleccionados
   selected.forEach((ni) => {
     const n = nucleos[ni];
@@ -460,6 +553,8 @@ function drawSelectedBuffersAndConnections(nucleos, satellites, satCandidates, s
   });
 
   // Conexiones: cada satélite al núcleo seleccionado más cercano (si existe)
+  let connectionCount = 0;
+
   for (let si = 0; si < satellites.length; si++) {
     const s = satellites[si];
     const cand = satCandidates[si] || [];
@@ -477,19 +572,27 @@ function drawSelectedBuffersAndConnections(nucleos, satellites, satCandidates, s
     if (bestNi >= 0) {
       const n = nucleos[bestNi];
 
-      L.polyline([[n.lat, n.lng], [s.lat, s.lng]], {
+      const line = L.polyline([[n.lat, n.lng], [s.lat, s.lng]], {
         color: "#58a6ff",
         weight: 1.5,
         opacity: 0.25,
-        dashArray: "5, 10",
+        dashArray: "6, 10",
+        dashOffset: "0",
         interactive: false,
         renderer: canvasRenderer
       }).addTo(layers.connections);
+
+      drawRefs.connectionLayers.push(line);
+      connectionCount++;
     }
   }
+
+  return connectionCount;
 }
 
-// ===== Grid helpers =====
+/* =========================
+   INDEXACIÓN GRILLA
+========================= */
 function buildGridIndex(nucleos) {
   const grid = new Map();
   for (let i = 0; i < nucleos.length; i++) {
@@ -503,12 +606,13 @@ function buildGridIndex(nucleos) {
 
 function findNucleosWithin(satellite, nucleos, grid) {
   const baseKey = gridKey(satellite.lat, satellite.lng);
-  const parts = baseKey.split("|");
-  const gx = Number(parts[0]);
-  const gy = Number(parts[1]);
+  const [gxStr, gyStr] = baseKey.split("|");
+  const gx = Number(gxStr);
+  const gy = Number(gyStr);
 
   const out = [];
 
+  // vecinos de celda (3x3)
   for (let dx = -1; dx <= 1; dx++) {
     for (let dy = -1; dy <= 1; dy++) {
       const k = (gx + dx) + "|" + (gy + dy);
@@ -519,7 +623,7 @@ function findNucleosWithin(satellite, nucleos, grid) {
         const ni = idxList[t];
         const n = nucleos[ni];
         const d = calculateDistance(satellite.lat, satellite.lng, n.lat, n.lng);
-        if (d <= BUFFER_RADIUS_M) out.push({ ni: ni, dist: d });
+        if (d <= BUFFER_RADIUS_M) out.push({ ni, dist: d });
       }
     }
   }
@@ -548,7 +652,9 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 }
 
-// ===== Popups / UI =====
+/* =========================
+   POPUPS
+========================= */
 function createNucleoPopup(n, st, isSelected) {
   const satCount = st ? st.satIdx.length : 0;
   const totalStudents = st ? st.totalStudents : (n.students || 0);
@@ -575,6 +681,7 @@ function createNucleoPopup(n, st, isSelected) {
 function createSatellitePopup(s, distMetersOrNull) {
   const covered = distMetersOrNull !== null;
   const km = covered ? (distMetersOrNull / 1000).toFixed(2) : "-";
+  const min = covered ? ((distMetersOrNull / 1000) / ASSUMED_SPEED_KMH * 60).toFixed(0) : "-";
 
   return (
     '<div class="popup-title">📍 Satélite</div>' +
@@ -582,7 +689,11 @@ function createSatellitePopup(s, distMetersOrNull) {
       '<div class="popup-row"><span class="popup-label">Institución:</span> <span class="popup-value">' + escapeHTML(s.name) + '</span></div>' +
       '<div class="popup-row"><span class="popup-label">Distrito:</span> <span class="popup-value">' + escapeHTML(s.dist) + '</span></div>' +
       '<div class="popup-row"><span class="popup-label">Estado:</span> <span class="popup-value" style="color:' + (covered ? "#3fb950" : "#f85149") + '">' + (covered ? "✓ Cubierto" : "✗ Sin cobertura") + '</span></div>' +
-      (covered ? '<div class="popup-row"><span class="popup-label">Distancia:</span> <span class="popup-value">' + km + ' km</span></div>' : '') +
+      (covered
+        ? '<div class="popup-row"><span class="popup-label">Distancia:</span> <span class="popup-value">' + km + ' km</span></div>' +
+          '<div class="popup-row"><span class="popup-label">Tiempo est.:</span> <span class="popup-value">' + min + ' min</span></div>'
+        : ''
+      ) +
       '<div class="popup-row"><span class="popup-label">Estudiantes:</span> <span class="popup-value" style="color:#d29922">' + Number(s.students || 0).toLocaleString() + '</span></div>' +
     '</div>'
   );
@@ -597,16 +708,47 @@ function escapeHTML(str) {
     .replaceAll("'", "&#039;");
 }
 
+/* =========================
+   MÉTRICAS UI
+========================= */
 function updateStatistics(stats) {
-  const elN = document.getElementById("totalNucleos");
-  const elS = document.getElementById("totalSatellites");
-  const elC = document.getElementById("coveragePercent");
-  const elT = document.getElementById("totalStudents");
+  setText("totalNucleos", stats.totalNucleos);
+  setText("totalSatellites", stats.totalSatellites);
+  setText("coveragePercent", (stats.coveragePercent ?? "0.0") + "%");
+  setText("totalStudents", stats.totalStudents);
 
-  if (elN) elN.textContent = Number(stats.totalNucleos || 0).toLocaleString();
-  if (elS) elS.textContent = Number(stats.totalSatellites || 0).toLocaleString();
-  if (elC) elC.textContent = (stats.coveragePercent ?? "0.0") + "%";
-  if (elT) elT.textContent = Number(stats.totalStudents || 0).toLocaleString();
+  // extra IDs que tienes en tu HTML (si existen)
+  setText("nucleosActivos", stats.nucleosActivos);
+  setText("sinCobertura", stats.sinCobertura);
+
+  setText("profActuales", stats.profActuales);
+  setText("profNecesarios", stats.profNecesarios);
+  setText("profDeficit", stats.profDeficit);
+
+  // barra de cobertura (si existe)
+  const fill = document.getElementById("coverageFill");
+  if (fill) fill.style.width = Math.max(0, Math.min(100, Number(stats.coveragePercent || 0))) + "%";
+
+  // tiempo promedio (si existe)
+  const avg = document.getElementById("avgTravelTime");
+  if (avg) {
+    if (Number.isFinite(stats.avgTravelMin)) {
+      avg.textContent = `${stats.avgTravelMin.toFixed(0)} min`;
+    } else {
+      avg.textContent = "-";
+    }
+  }
+}
+
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    el.textContent = "-";
+    return;
+  }
+  if (typeof value === "number") el.textContent = value.toLocaleString();
+  else el.textContent = String(value);
 }
 
 function updateTopNucleosFromStats(nucleoStats) {
@@ -614,7 +756,7 @@ function updateTopNucleosFromStats(nucleoStats) {
   if (!container) return;
 
   const sorted = nucleoStats
-    .map((st, i) => ({ st: st, i: i }))
+    .map((st, i) => ({ st, i }))
     .sort((a, b) => b.st.satIdx.length - a.st.satIdx.length)
     .slice(0, 10);
 
@@ -640,7 +782,38 @@ function flyToLocation(lat, lng) {
   map.flyTo([lat, lng], 12, { duration: 1.2 });
 }
 
-// ===== Controles =====
+/* =========================
+   TIEMPO PROMEDIO (solo satélites cubiertos por selected)
+========================= */
+function estimateAvgTravelMinutes(nucleos, satellites, satCandidates, selected) {
+  let sumMin = 0;
+  let count = 0;
+
+  for (let si = 0; si < satellites.length; si++) {
+    const cand = satCandidates[si] || [];
+    let bestDist = BUFFER_RADIUS_M + 1;
+
+    for (let c = 0; c < cand.length; c++) {
+      if (selected.has(cand[c].ni) && cand[c].dist < bestDist) {
+        bestDist = cand[c].dist;
+      }
+    }
+
+    if (bestDist <= BUFFER_RADIUS_M) {
+      const km = bestDist / 1000;
+      const minutes = (km / ASSUMED_SPEED_KMH) * 60;
+      sumMin += minutes;
+      count++;
+    }
+  }
+
+  if (!count) return NaN;
+  return sumMin / count;
+}
+
+/* =========================
+   CONTROLES
+========================= */
 function setupControls() {
   const byId = (id) => document.getElementById(id);
 
@@ -684,4 +857,57 @@ function bindLayerToggle(id, layer) {
     if (e.target.checked) map.addLayer(layer);
     else map.removeLayer(layer);
   });
+}
+
+/* =========================
+   ANIMACIONES “TIPO REDES”
+========================= */
+function startConnectionAnimation(lines) {
+  let offset = 0;
+  _connectionAnimTimer = setInterval(() => {
+    offset = (offset + 1) % 1000;
+    for (let i = 0; i < lines.length; i++) {
+      lines[i].setStyle({ dashOffset: String(offset) });
+    }
+  }, 80);
+}
+
+function startNucleoPulse(nucleoLayers, nucleos, nucleoStats, selected) {
+  // pulso solo en top 8 núcleos seleccionados por absorción (closest)
+  const top = nucleoStats
+    .map((st, ni) => ({ ni, k: st.satIdx.length }))
+    .filter(x => selected.has(x.ni))
+    .sort((a, b) => b.k - a.k)
+    .slice(0, 8)
+    .map(x => x.ni);
+
+  if (!top.length) return;
+
+  _pulsePhase = 0;
+  _pulseTimer = setInterval(() => {
+    _pulsePhase += 0.25;
+
+    for (let i = 0; i < top.length; i++) {
+      const ni = top[i];
+      const layer = nucleoLayers.get(ni);
+      if (!layer) continue;
+
+      // pulso suave: sube/baja radio un poco
+      const base = layer.options.radius || 10;
+      const delta = 1.2 * (1 + Math.sin(_pulsePhase + i)) * 0.5; // 0..1.2
+      layer.setStyle({ opacity: 1, fillOpacity: 0.95 });
+      layer.setRadius(Math.max(6, base + delta));
+    }
+  }, 120);
+}
+
+function stopAnimations() {
+  if (_connectionAnimTimer) {
+    clearInterval(_connectionAnimTimer);
+    _connectionAnimTimer = null;
+  }
+  if (_pulseTimer) {
+    clearInterval(_pulseTimer);
+    _pulseTimer = null;
+  }
 }
