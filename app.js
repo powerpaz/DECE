@@ -1,5 +1,8 @@
-// Variables Globales
+/*************************************************
+ * VARIABLES GLOBALES
+ *************************************************/
 let map;
+
 let layers = {
     nucleos: L.featureGroup(),
     satellites: L.featureGroup(),
@@ -10,16 +13,20 @@ let layers = {
 const BUFFER_RADIUS_M = 7500; // 7.5 km
 const ECUADOR_CENTER = [-1.831239, -78.183406];
 
-// Inicialización
+/*************************************************
+ * INICIALIZACIÓN
+ *************************************************/
 document.addEventListener('DOMContentLoaded', init);
 
 function init() {
     initMap();
-    processData();
+    loadCSVData();
     setupControls();
 }
 
-// Inicializar Mapa
+/*************************************************
+ * MAPA BASE
+ *************************************************/
 function initMap() {
     map = L.map('map', {
         center: ECUADOR_CENTER,
@@ -28,391 +35,260 @@ function initMap() {
         preferCanvas: true
     });
 
-    // Capa OSM
-    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors',
-        maxZoom: 19
-    });
+    const osmLayer = L.tileLayer(
+        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        { attribution: '© OpenStreetMap', maxZoom: 19 }
+    );
 
-    // Capa Satelital
-    const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        attribution: '© Esri',
-        maxZoom: 19
-    });
+    const satelliteLayer = L.tileLayer(
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        { attribution: '© Esri', maxZoom: 19 }
+    );
 
-    // Agregar capa por defecto
     osmLayer.addTo(map);
 
-    // Control de capas
     L.control.layers({
         'OpenStreetMap': osmLayer,
         'Satélite': satelliteLayer
     }).addTo(map);
 
-    // Agregar grupos de features al mapa
     Object.values(layers).forEach(layer => layer.addTo(map));
 }
 
-// Procesar Datos
-function processData() {
-    console.log('Procesando', window.DECE_DATA ? DECE_DATA.length : 0, 'instituciones');
+/*************************************************
+ * CARGA CSV
+ *************************************************/
+function loadCSVData() {
+    Papa.parse("DECE_CRUCE_X_Y_NUC_SAT.csv", {
+        download: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+            const data = mapCSVToData(results.data);
+            processData(data);
+        },
+        error: (err) => {
+            console.error(err);
+            document.querySelector('#loadingOverlay .loading-text').innerText =
+                'Error al cargar el archivo CSV';
+        }
+    });
+}
 
-    // Usar datos de ejemplo si no hay datos reales
-    const data = window.DECE_DATA || generateSampleData();
-    
-    // Filtrar por COD_GDECE
+/*************************************************
+ * MAPEO CSV → MODELO INTERNO
+ * Columnas Excel:
+ * E (4) = latitud
+ * F (5) = longitud
+ *************************************************/
+function mapCSVToData(rows) {
+    const data = [];
+
+    for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+
+        const lat = parseFloat(r[4]);
+        const lng = parseFloat(r[5]);
+        const cod = Number(r[6]);
+
+        if (isNaN(lat) || isNaN(lng)) continue;
+        if (![2, 3, 4, 5].includes(cod)) continue;
+
+        data.push({
+            lat,
+            lng,
+            cod,
+            name: r[0] || 'IE sin nombre',
+            dist: r[1] || 'N/D',
+            zone: r[2] || 'N/D',
+            students: Number(r[7]) || 0,
+            profs: Number(r[8]) || 0
+        });
+    }
+    return data;
+}
+
+/*************************************************
+ * PROCESAMIENTO PRINCIPAL
+ *************************************************/
+function processData(data) {
+
     const nucleos = data.filter(d => [3, 4, 5].includes(d.cod));
     const satellites = data.filter(d => d.cod === 2);
-    
-    console.log('Núcleos:', nucleos.length, '| Satellites:', satellites.length);
 
-    // Procesar núcleos y construir conexiones
     const nucleoStats = new Map();
 
-    nucleos.forEach(nucleo => {
-        const key = `${nucleo.lat},${nucleo.lng}`;
+    nucleos.forEach(n => {
+        const key = `${n.lat},${n.lng}`;
         nucleoStats.set(key, {
-            nucleo: nucleo,
+            nucleo: n,
             satellites: [],
-            totalStudents: nucleo.students
+            totalStudents: n.students
         });
 
-        // Dibujar buffer
-        const buffer = L.circle([nucleo.lat, nucleo.lng], {
+        L.circle([n.lat, n.lng], {
             radius: BUFFER_RADIUS_M,
-            fillColor: '#f85149',
             color: '#f85149',
+            fillColor: '#f85149',
             weight: 2,
             opacity: 0.4,
             fillOpacity: 0.08
-        });
-        buffer.addTo(layers.buffers);
+        }).addTo(layers.buffers);
     });
 
-    // Procesar satellites y encontrar núcleo más cercano
     let satellitesCovered = 0;
-    const satellitesList = [];
 
-    satellites.forEach(satellite => {
-        let closestNucleo = null;
-        let minDistance = BUFFER_RADIUS_M;
+    satellites.forEach(s => {
+        let closest = null;
+        let minDist = BUFFER_RADIUS_M;
 
-        nucleos.forEach(nucleo => {
-            const distance = calculateDistance(
-                satellite.lat, satellite.lng,
-                nucleo.lat, nucleo.lng
-            );
-
-            if (distance <= BUFFER_RADIUS_M && distance < minDistance) {
-                minDistance = distance;
-                closestNucleo = nucleo;
+        nucleos.forEach(n => {
+            const d = calculateDistance(s.lat, s.lng, n.lat, n.lng);
+            if (d <= BUFFER_RADIUS_M && d < minDist) {
+                minDist = d;
+                closest = n;
             }
         });
 
-        // Determinar color según cobertura
-        const isCovered = closestNucleo !== null;
-        const color = isCovered ? '#58a6ff' : '#6e7681';
+        const covered = closest !== null;
+        const color = covered ? '#58a6ff' : '#6e7681';
 
-        // Dibujar marcador de satellite
-        const satelliteMarker = L.circleMarker([satellite.lat, satellite.lng], {
+        L.circleMarker([s.lat, s.lng], {
             radius: 6,
             fillColor: color,
             color: '#ffffff',
             weight: 2,
-            opacity: 0.9,
             fillOpacity: 0.8
-        });
+        })
+        .bindPopup(createSatellitePopup(s, closest, minDist))
+        .addTo(layers.satellites);
 
-        satelliteMarker.bindPopup(createSatellitePopup(satellite, closestNucleo, minDistance));
-        satelliteMarker.addTo(layers.satellites);
-
-        // Si está cubierto, dibujar conexión
-        if (closestNucleo) {
+        if (covered) {
             satellitesCovered++;
-
-            const key = `${closestNucleo.lat},${closestNucleo.lng}`;
+            const key = `${closest.lat},${closest.lng}`;
             const stats = nucleoStats.get(key);
-            stats.satellites.push(satellite);
-            stats.totalStudents += satellite.students;
+            stats.satellites.push(s);
+            stats.totalStudents += s.students;
 
-            // Dibujar línea de conexión
-            const line = L.polyline(
-                [[closestNucleo.lat, closestNucleo.lng], [satellite.lat, satellite.lng]],
-                {
-                    color: '#58a6ff',
-                    weight: 2,
-                    opacity: 0.6,
-                    dashArray: '5, 10'
-                }
-            );
-            line.addTo(layers.connections);
+            L.polyline(
+                [[closest.lat, closest.lng], [s.lat, s.lng]],
+                { color: '#58a6ff', weight: 2, opacity: 0.6, dashArray: '5,10' }
+            ).addTo(layers.connections);
         }
-
-        satellitesList.push({
-            institution: satellite,
-            connected: isCovered
-        });
     });
 
-    // Dibujar marcadores de núcleos
-    nucleos.forEach(nucleo => {
-        const key = `${nucleo.lat},${nucleo.lng}`;
+    nucleos.forEach(n => {
+        const key = `${n.lat},${n.lng}`;
         const stats = nucleoStats.get(key);
 
-        const nucleoMarker = L.circleMarker([nucleo.lat, nucleo.lng], {
+        L.circleMarker([n.lat, n.lng], {
             radius: 10,
             fillColor: '#f85149',
             color: '#ffffff',
             weight: 3,
-            opacity: 1,
             fillOpacity: 0.9
-        });
-
-        nucleoMarker.bindPopup(createNucleoPopup(nucleo, stats));
-        nucleoMarker.addTo(layers.nucleos);
+        })
+        .bindPopup(createNucleoPopup(n, stats))
+        .addTo(layers.nucleos);
     });
 
-    // Calcular cobertura
-    const coveragePercent = ((satellitesCovered / satellites.length) * 100).toFixed(1);
-
-    // Actualizar estadísticas
     updateStatistics({
         totalNucleos: nucleos.length,
         totalSatellites: satellites.length,
-        satellitesCovered: satellitesCovered,
-        coveragePercent: coveragePercent,
-        totalStudents: data.reduce((sum, d) => sum + d.students, 0)
+        satellitesCovered,
+        coveragePercent: ((satellitesCovered / satellites.length) * 100).toFixed(1),
+        totalStudents: data.reduce((s, d) => s + d.students, 0)
     });
 
-    // Actualizar top núcleos
     updateTopNucleos(nucleoStats);
 
-    // Ocultar loading
     document.getElementById('loadingOverlay').classList.add('hidden');
 }
 
-// Calcular Distancia (Haversine)
+/*************************************************
+ * DISTANCIA HAVERSINE
+ *************************************************/
 function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371000; // Radio de la Tierra en metros
+    const R = 6371000;
     const φ1 = lat1 * Math.PI / 180;
     const φ2 = lat2 * Math.PI / 180;
     const Δφ = (lat2 - lat1) * Math.PI / 180;
     const Δλ = (lon2 - lon1) * Math.PI / 180;
 
-    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const a =
+        Math.sin(Δφ / 2) ** 2 +
+        Math.cos(φ1) * Math.cos(φ2) *
+        Math.sin(Δλ / 2) ** 2;
 
-    return R * c;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Crear Popups
-function createNucleoPopup(nucleo, stats) {
-    const profesionalesNecesarios = Math.ceil(stats.totalStudents / 450);
-    const deficit = profesionalesNecesarios - nucleo.profs;
+/*************************************************
+ * POPUPS
+ *************************************************/
+function createNucleoPopup(n, stats) {
+    const profNecesarios = Math.ceil(stats.totalStudents / 450);
+    const deficit = profNecesarios - n.profs;
 
     return `
-        <div class="popup-title">🏛️ Núcleo DECE</div>
-        <div class="popup-content">
-            <div class="popup-row">
-                <span class="popup-label">Institución:</span>
-                <span class="popup-value">${nucleo.name}</span>
-            </div>
-            <div class="popup-row">
-                <span class="popup-label">Distrito:</span>
-                <span class="popup-value">${nucleo.dist}</span>
-            </div>
-            <div class="popup-row">
-                <span class="popup-label">Satellites conectados:</span>
-                <span class="popup-value" style="color: #58a6ff;">${stats.satellites.length}</span>
-            </div>
-            <div class="popup-row">
-                <span class="popup-label">Estudiantes totales:</span>
-                <span class="popup-value" style="color: #d29922;">${stats.totalStudents.toLocaleString()}</span>
-            </div>
-            <div class="popup-row">
-                <span class="popup-label">Profesionales necesarios:</span>
-                <span class="popup-value">${profesionalesNecesarios}</span>
-            </div>
-            <div class="popup-row">
-                <span class="popup-label">Profesionales actuales:</span>
-                <span class="popup-value" style="color: ${deficit > 0 ? '#f85149' : '#3fb950'};">${nucleo.profs}</span>
-            </div>
-            ${deficit > 0 ? `
-            <div class="popup-row">
-                <span class="popup-label">Déficit:</span>
-                <span class="popup-value" style="color: #f85149;">${deficit}</span>
-            </div>
-            ` : ''}
-        </div>
+    <div class="popup-title">🏛️ Núcleo DECE</div>
+    <div class="popup-row"><b>${n.name}</b></div>
+    <div class="popup-row">Distrito: ${n.dist}</div>
+    <div class="popup-row">Satélites: ${stats.satellites.length}</div>
+    <div class="popup-row">Estudiantes: ${stats.totalStudents}</div>
+    <div class="popup-row">Prof. necesarios: ${profNecesarios}</div>
+    <div class="popup-row" style="color:${deficit>0?'#f85149':'#3fb950'}">
+        Prof. actuales: ${n.profs}
+    </div>`;
+}
+
+function createSatellitePopup(s, n, d) {
+    return `
+    <div class="popup-title">📍 Satélite</div>
+    <div class="popup-row"><b>${s.name}</b></div>
+    <div class="popup-row">Estado:
+        <span style="color:${n?'#3fb950':'#f85149'}">
+            ${n?'Cubierto':'Sin cobertura'}
+        </span>
+    </div>
+    ${n ? `<div class="popup-row">Distancia: ${(d/1000).toFixed(2)} km</div>` : ''}
     `;
 }
 
-function createSatellitePopup(satellite, nucleo, distance) {
-    const distanceKm = (distance / 1000).toFixed(2);
-    const covered = nucleo !== null;
-
-    return `
-        <div class="popup-title">📍 Satellite</div>
-        <div class="popup-content">
-            <div class="popup-row">
-                <span class="popup-label">Institución:</span>
-                <span class="popup-value">${satellite.name}</span>
-            </div>
-            <div class="popup-row">
-                <span class="popup-label">Distrito:</span>
-                <span class="popup-value">${satellite.dist}</span>
-            </div>
-            <div class="popup-row">
-                <span class="popup-label">Estado:</span>
-                <span class="popup-value" style="color: ${covered ? '#3fb950' : '#f85149'};">
-                    ${covered ? '✓ Cubierto' : '✗ Sin cobertura'}
-                </span>
-            </div>
-            ${covered ? `
-            <div class="popup-row">
-                <span class="popup-label">Núcleo asignado:</span>
-                <span class="popup-value">${nucleo.name.substring(0, 30)}...</span>
-            </div>
-            <div class="popup-row">
-                <span class="popup-label">Distancia:</span>
-                <span class="popup-value">${distanceKm} km</span>
-            </div>
-            ` : ''}
-            <div class="popup-row">
-                <span class="popup-label">Estudiantes:</span>
-                <span class="popup-value" style="color: #d29922;">${satellite.students.toLocaleString()}</span>
-            </div>
-        </div>
-    `;
+/*************************************************
+ * ESTADÍSTICAS Y TOP
+ *************************************************/
+function updateStatistics(s) {
+    document.getElementById('totalNucleos').textContent = s.totalNucleos;
+    document.getElementById('totalSatellites').textContent = s.totalSatellites;
+    document.getElementById('coveragePercent').textContent = s.coveragePercent + '%';
+    document.getElementById('totalStudents').textContent = s.totalStudents;
 }
 
-// Actualizar Estadísticas
-function updateStatistics(stats) {
-    document.getElementById('totalNucleos').textContent = stats.totalNucleos.toLocaleString();
-    document.getElementById('totalSatellites').textContent = stats.totalSatellites.toLocaleString();
-    document.getElementById('coveragePercent').textContent = stats.coveragePercent + '%';
-    document.getElementById('totalStudents').textContent = stats.totalStudents.toLocaleString();
-}
-
-// Actualizar Top Núcleos
-function updateTopNucleos(nucleoStats) {
-    const sortedNucleos = Array.from(nucleoStats.values())
+function updateTopNucleos(mapStats) {
+    const top = [...mapStats.values()]
         .sort((a, b) => b.satellites.length - a.satellites.length)
         .slice(0, 10);
 
-    const html = sortedNucleos.map((stats, index) => {
-        const profesionalesNecesarios = Math.ceil(stats.totalStudents / 450);
-        return `
-            <div class="top-item" onclick="flyToLocation(${stats.nucleo.lat}, ${stats.nucleo.lng})">
-                <div class="top-item-header">
-                    <span class="top-rank">#${index + 1}</span>
-                    <span class="top-name">${stats.nucleo.name}</span>
-                    <span class="top-count">${stats.satellites.length}</span>
-                </div>
-                <div class="top-desc">
-                    ${stats.totalStudents.toLocaleString()} estudiantes • ${profesionalesNecesarios} prof. necesarios
-                </div>
-            </div>
-        `;
-    }).join('');
-
-    document.getElementById('topNucleos').innerHTML = html;
+    document.getElementById('topNucleos').innerHTML = top.map((s, i) => `
+        <div class="top-item" onclick="map.flyTo([${s.nucleo.lat},${s.nucleo.lng}],12)">
+            <b>#${i+1}</b> ${s.nucleo.name} (${s.satellites.length})
+        </div>
+    `).join('');
 }
 
-// Volar a Ubicación
-function flyToLocation(lat, lng) {
-    map.flyTo([lat, lng], 12, {
-        duration: 1.5
-    });
-}
-
-// Configurar Controles
+/*************************************************
+ * CONTROLES
+ *************************************************/
 function setupControls() {
-    // Toggle de paneles
-    document.getElementById('toggleStats').addEventListener('click', () => {
-        const panel = document.getElementById('statsPanel');
-        panel.classList.toggle('active');
-        document.getElementById('legendPanel').classList.remove('active');
-    });
+    document.getElementById('toggleBuffers').onchange = e =>
+        e.target.checked ? map.addLayer(layers.buffers) : map.removeLayer(layers.buffers);
 
-    document.getElementById('toggleLegend').addEventListener('click', () => {
-        const panel = document.getElementById('legendPanel');
-        panel.classList.toggle('active');
-        document.getElementById('statsPanel').classList.remove('active');
-    });
+    document.getElementById('toggleConnections').onchange = e =>
+        e.target.checked ? map.addLayer(layers.connections) : map.removeLayer(layers.connections);
 
-    // Toggle de capas
-    document.getElementById('toggleBuffers').addEventListener('change', (e) => {
-        if (e.target.checked) {
-            map.addLayer(layers.buffers);
-        } else {
-            map.removeLayer(layers.buffers);
-        }
-    });
+    document.getElementById('toggleNucleos').onchange = e =>
+        e.target.checked ? map.addLayer(layers.nucleos) : map.removeLayer(layers.nucleos);
 
-    document.getElementById('toggleConnections').addEventListener('change', (e) => {
-        if (e.target.checked) {
-            map.addLayer(layers.connections);
-        } else {
-            map.removeLayer(layers.connections);
-        }
-    });
-
-    document.getElementById('toggleNucleos').addEventListener('change', (e) => {
-        if (e.target.checked) {
-            map.addLayer(layers.nucleos);
-        } else {
-            map.removeLayer(layers.nucleos);
-        }
-    });
-
-    document.getElementById('toggleSatellites').addEventListener('change', (e) => {
-        if (e.target.checked) {
-            map.addLayer(layers.satellites);
-        } else {
-            map.removeLayer(layers.satellites);
-        }
-    });
-
-    // Mostrar panel de estadísticas al cargar
-    setTimeout(() => {
-        document.getElementById('statsPanel').classList.add('active');
-    }, 500);
-}
-
-// Generar Datos de Ejemplo (REEMPLAZAR CON TUS DATOS REALES)
-function generateSampleData() {
-    const data = [];
-    
-    // Generar núcleos de ejemplo en Ecuador
-    for (let i = 0; i < 20; i++) {
-        data.push({
-            lat: -1.5 + Math.random() * 2,
-            lng: -78 + Math.random() * 4,
-            cod: [3, 4, 5][Math.floor(Math.random() * 3)],
-            name: `Núcleo DECE ${i + 1}`,
-            dist: `Distrito ${Math.floor(Math.random() * 10) + 1}`,
-            zone: `Zona ${Math.floor(Math.random() * 5) + 1}`,
-            students: Math.floor(Math.random() * 800) + 200,
-            profs: Math.floor(Math.random() * 3) + 1
-        });
-    }
-    
-    // Generar satellites de ejemplo
-    for (let i = 0; i < 50; i++) {
-        data.push({
-            lat: -1.5 + Math.random() * 2,
-            lng: -78 + Math.random() * 4,
-            cod: 2,
-            name: `Satellite ${i + 1}`,
-            dist: `Distrito ${Math.floor(Math.random() * 10) + 1}`,
-            zone: `Zona ${Math.floor(Math.random() * 5) + 1}`,
-            students: Math.floor(Math.random() * 400) + 50,
-            profs: Math.floor(Math.random() * 2) + 1
-        });
-    }
-    
-    return data;
+    document.getElementById('toggleSatellites').onchange = e =>
+        e.target.checked ? map.addLayer(layers.satellites) : map.removeLayer(layers.satellites);
 }
