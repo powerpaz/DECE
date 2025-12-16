@@ -561,10 +561,9 @@ function drawSelectedNucleos(nucleos, nucleoStats, selected, drawRefs) {
   for (let ni = 0; ni < nucleos.length; ni++) {
     const n = nucleos[ni];
     const st = nucleoStats[ni];
-    const satCount = st ? st.satIdx.length : 0;
 
     const isSelected = selected.has(ni);
-    const radius = isSelected ? (8 + Math.min(10, Math.sqrt(satCount + 1))) : 5;
+    const radius = isSelected ? 8 : 6;
 
     const layer = L.circleMarker([n.lat, n.lng], {
       radius,
