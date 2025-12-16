@@ -1,0 +1,1577 @@
+{
+  "summary": {
+    "total_nucleos": 6469,
+    "total_satellites": 2096,
+    "covered": 1907,
+    "uncovered": 189,
+    "coverage_pct": 91.0,
+    "active_nucleos": 1510,
+    "total_students": 4166271,
+    "total_profs": 11790,
+    "profs_needed": 9259
+  },
+  "top_nucleos": [
+    {
+      "lat": -1.81295860282,
+      "lng": -79.7566188873,
+      "name": "UNIDAD EDUCATIVA ZENON VELEZ VITERI",
+      "distrito": "09D20",
+      "satellites_count": 5,
+      "total_students": 974,
+      "profs_needed": 3,
+      "profs_actual": 2
+    },
+    {
+      "lat": -1.88809164143,
+      "lng": -78.7219371352,
+      "name": "UNIDAD EDUCATIVA COMUNITARIA INTERCULTURAL BILINGÜE HUALCOPO DUCHICELA",
+      "distrito": "06D04",
+      "satellites_count": 5,
+      "total_students": 1203,
+      "profs_needed": 3,
+      "profs_actual": 2
+    },
+    {
+      "lat": -0.799947719792,
+      "lng": -78.919943317,
+      "name": "UNIDAD EDUCATIVA JUAN JOSÉ FLORES",
+      "distrito": "05D05",
+      "satellites_count": 5,
+      "total_students": 818,
+      "profs_needed": 2,
+      "profs_actual": 1
+    },
+    {
+      "lat": -2.63443235637,
+      "lng": -77.4313939658,
+      "name": "UNIDAD EDUCATIVA COMUNITARIA INTERCULTURAL BILINGÜE KANUS",
+      "distrito": "14D05",
+      "satellites_count": 5,
+      "total_students": 577,
+      "profs_needed": 2,
+      "profs_actual": 1
+    },
+    {
+      "lat": -1.78028506205,
+      "lng": -79.996406692,
+      "name": "UNIDAD EDUCATIVA JOSE ABEL CASTILLO",
+      "distrito": "09D19",
+      "satellites_count": 4,
+      "total_students": 848,
+      "profs_needed": 2,
+      "profs_actual": 2
+    },
+    {
+      "lat": -1.16447217841,
+      "lng": -80.0540119617,
+      "name": "ELOY ALFARO",
+      "distrito": "13D04",
+      "satellites_count": 4,
+      "total_students": 616,
+      "profs_needed": 2,
+      "profs_actual": 1
+    },
+    {
+      "lat": -1.86681604347,
+      "lng": -78.7581607545,
+      "name": "UNIDAD EDUCATIVA COMUNITARIA INTERCULTURAL BILINGÜE DUCHICELA SHIRY XII",
+      "distrito": "06D04",
+      "satellites_count": 4,
+      "total_students": 441,
+      "profs_needed": 1,
+      "profs_actual": 1
+    },
+    {
+      "lat": -0.961873601572,
+      "lng": -78.8987283107,
+      "name": "UNIDAD EDUCATIVA DEL MILENIO CACIQUE TUMBALA",
+      "distrito": "05D04",
+      "satellites_count": 4,
+      "total_students": 970,
+      "profs_needed": 3,
+      "profs_actual": 2
+    },
+    {
+      "lat": -2.00181283174,
+      "lng": -77.7006015678,
+      "name": "UNIDAD EDUCATIVA COMUNITARIA INTERCULTURAL BILINGÜE KUMAY",
+      "distrito": "16D01",
+      "satellites_count": 4,
+      "total_students": 651,
+      "profs_needed": 2,
+      "profs_actual": 1
+    },
+    {
+      "lat": -0.234596301885,
+      "lng": -78.490527993,
+      "name": "UNIDAD EDUCATIVA PARTICULAR KHIPU",
+      "distrito": "17D04",
+      "satellites_count": 4,
+      "total_students": 494,
+      "profs_needed": 2,
+      "profs_actual": 1
+    }
+  ],
+  "suggestions": [
+    {
+      "lat": -2.8178251388175,
+      "lng": -77.77585912155,
+      "satellites_count": 4,
+      "students": 289,
+      "profs_needed": 1,
+      "nearest_existing": "UNIDAD EDUCATIVA REAL AUDIENCIA DE QUITO",
+      "dist_to_nearest_km": 14.13
+    },
+    {
+      "lat": -0.496925928862,
+      "lng": -80.048592594,
+      "satellites_count": 3,
+      "students": 212,
+      "profs_needed": 1,
+      "nearest_existing": "UNIDAD EDUCATIVA RAYMUNDO AVEIGA MOREIRA",
+      "dist_to_nearest_km": 8.25
+    },
+    {
+      "lat": -3.8553858414566666,
+      "lng": -79.15418924193334,
+      "satellites_count": 3,
+      "students": 213,
+      "profs_needed": 1,
+      "nearest_existing": "ESCUELA DE EDUCACION BASICA POMPILIO REINOSO JARAMILLO",
+      "dist_to_nearest_km": 12.0
+    },
+    {
+      "lat": -2.630527776656667,
+      "lng": -77.79169442416666,
+      "satellites_count": 3,
+      "students": 267,
+      "profs_needed": 1,
+      "nearest_existing": "UNIDAD EDUCATIVA COMUNITARIA INTERCULTURAL BILINGÜE PANINTS",
+      "dist_to_nearest_km": 29.25
+    },
+    {
+      "lat": -2.6869166461200003,
+      "lng": -77.51530553576667,
+      "satellites_count": 3,
+      "students": 211,
+      "profs_needed": 1,
+      "nearest_existing": "UNIDAD EDUCATIVA COMUNITARIA INTERCULTURAL BILINGÜE KANUS",
+      "dist_to_nearest_km": 11.0
+    },
+    {
+      "lat": -2.3261985483650003,
+      "lng": -79.0946550633,
+      "satellites_count": 2,
+      "students": 149,
+      "profs_needed": 1,
+      "nearest_existing": "UNIDAD EDUCATIVA SHUNGUMARCA",
+      "dist_to_nearest_km": 12.13
+    },
+    {
+      "lat": -3.74776195053,
+      "lng": -79.71527767079999,
+      "satellites_count": 2,
+      "students": 150,
+      "profs_needed": 1,
+      "nearest_existing": "ESCUELA DE EDUCACIÓN BÁSICA DR FEDERICO GONZALEZ SUÁREZ",
+      "dist_to_nearest_km": 8.24
+    },
+    {
+      "lat": -1.752139488725,
+      "lng": -80.34277340240001,
+      "satellites_count": 2,
+      "students": 154,
+      "profs_needed": 1,
+      "nearest_existing": "UNIDAD EDUCATIVA SAN FRANCISCO DE ASIS",
+      "dist_to_nearest_km": 10.39
+    },
+    {
+      "lat": -1.3405722713100001,
+      "lng": -79.61310844810001,
+      "satellites_count": 2,
+      "students": 195,
+      "profs_needed": 1,
+      "nearest_existing": "ESCUELA DE EDUCACION BASICA PROF JACINTO CARLIER CASTRO",
+      "dist_to_nearest_km": 9.01
+    },
+    {
+      "lat": -1.28652208499,
+      "lng": -79.58081904779999,
+      "satellites_count": 2,
+      "students": 121,
+      "profs_needed": 1,
+      "nearest_existing": "UNIDAD EDUCATIVA INDOAMERICA",
+      "dist_to_nearest_km": 10.99
+    },
+    {
+      "lat": 0.13441613811699998,
+      "lng": -79.78015807865,
+      "satellites_count": 2,
+      "students": 163,
+      "profs_needed": 1,
+      "nearest_existing": "CAÑAVERAL DEL NARANJO",
+      "dist_to_nearest_km": 8.81
+    },
+    {
+      "lat": 0.205702740021,
+      "lng": -79.0184229779,
+      "satellites_count": 2,
+      "students": 117,
+      "profs_needed": 1,
+      "nearest_existing": "UNIDAD EDUCATIVA CELICA",
+      "dist_to_nearest_km": 7.65
+    },
+    {
+      "lat": -3.40287436802,
+      "lng": -79.17860967544999,
+      "satellites_count": 2,
+      "students": 218,
+      "profs_needed": 1,
+      "nearest_existing": "UNIDAD EDUCATIVA  OÑA",
+      "dist_to_nearest_km": 7.71
+    },
+    {
+      "lat": 1.17965818226,
+      "lng": -78.46974151455,
+      "satellites_count": 2,
+      "students": 111,
+      "profs_needed": 1,
+      "nearest_existing": "UNIDAD EDUCATIVA COMUNITARIA  INTERCULTURAL BILINGÜE LUCIANO GERMAN NASTACUAZ",
+      "dist_to_nearest_km": 10.01
+    },
+    {
+      "lat": -2.4766678939749998,
+      "lng": -78.6103569438,
+      "satellites_count": 2,
+      "students": 159,
+      "profs_needed": 1,
+      "nearest_existing": "UNIDAD EDUCATIVA MARISCAL ANTONIO JOSE DE SUCRE",
+      "dist_to_nearest_km": 11.88
+    }
+  ],
+  "uncovered_satellites": [
+    {
+      "lat": -2.69219307956,
+      "lng": -79.4144422491,
+      "name": "UNIDAD EDUCATIVA 24 DE MAYO",
+      "students": 66,
+      "distrito": "01D02"
+    },
+    {
+      "lat": -2.07256299051,
+      "lng": -79.086859614,
+      "name": "UNIDAD EDUCATIVA ÁNGEL JACINTO VILLARES ESPÍN",
+      "students": 100,
+      "distrito": "02D02"
+    },
+    {
+      "lat": -1.47868826186,
+      "lng": -79.1894136172,
+      "name": "ESCUELA DE EDUCACION BASICA LEONIDAS PLAZA GUTIERREZ",
+      "students": 52,
+      "distrito": "02D01"
+    },
+    {
+      "lat": -1.40542905973,
+      "lng": -79.2136648446,
+      "name": "ESCUELA DE EDUCACION BASICA SAN JOSE DE CAMARON",
+      "students": 103,
+      "distrito": "02D04"
+    },
+    {
+      "lat": -1.35047397643,
+      "lng": -79.1567191214,
+      "name": "UNIDAD EDUCATIVA  LA PALMA",
+      "students": 80,
+      "distrito": "02D01"
+    },
+    {
+      "lat": -2.31711116481,
+      "lng": -79.0993611555,
+      "name": "CECIB DE EDUCACION BASICA NINA PAKARI",
+      "students": 60,
+      "distrito": "03D02"
+    },
+    {
+      "lat": -2.33528593192,
+      "lng": -79.0899489711,
+      "name": "UNIDAD EDUCATIVA COMUNITARIA INTERCULTURAL BILINGÜE PACHAKUTIK",
+      "students": 89,
+      "distrito": "03D02"
+    },
+    {
+      "lat": -1.86646687886,
+      "lng": -78.9992994071,
+      "name": "UNIDAD EDUCATIVA 10 DE AGOSTO",
+      "students": 59,
+      "distrito": "06D04"
+    },
+    {
+      "lat": -1.03779525427,
+      "lng": -79.0879891828,
+      "name": "UNIDAD EDUCATIVA COMUNITARIA INTERCULTURAL BILINGÜE REPÚBLICA DOMINICANA ",
+      "students": 67,
+      "distrito": "05D03"
+    },
+    {
+      "lat": -3.748176545,
+      "lng": -79.715391997,
+      "name": "COLEGIO DE BACHILLERATO GALO PLAZA LASSO",
+      "students": 91,
+      "distrito": "07D04"
+    },
+    {
+      "lat": -3.74734735606,
+      "lng": -79.7151633446,
+      "name": "ESCUELA DE EDUCACIÓN BÁSICA SEBASTIAN DE BENALCAZAR",
+      "students": 59,
+      "distrito": "07D04"
+    },
+    {
+      "lat": -3.34835817467,
+      "lng": -80.1639613655,
+      "name": "UNIDAD EDUCATIVA PROVINCIA DE PICHINCHA",
+      "students": 73,
+      "distrito": "07D06"
+    },
+    {
+      "lat": 0.875632997188,
+      "lng": -78.7952945222,
+      "name": "ESCUELA EGB  RITA LECUMBERRI",
+      "students": 59,
+      "distrito": "08D02"
+    },
+    {
+      "lat": 0.778289360898,
+      "lng": -79.1617300371,
+      "name": "CENTRO DE EDUCACION COMUNITARIO INTERCULTURAL BILINGUE ROSENDO ORTIZ",
+      "students": 80,
+      "distrito": "08D02"
+    },
+    {
+      "lat": 0.788713808223,
+      "lng": -78.8231928287,
+      "name": "CECIB TYAIPI",
+      "students": 67,
+      "distrito": "08D02"
+    },
+    {
+      "lat": 0.583431521316,
+      "lng": -79.0853100907,
+      "name": "CENTRO EDUCATIVO COMUNITARIO INTERCULTURAL BILINGÜE  TEEKALI",
+      "students": 91,
+      "distrito": "08D02"
+    },
+    {
+      "lat": 0.409575815711,
+      "lng": -79.7097238868,
+      "name": "ESCUELA EGB  FISCAL JESUS DEL GRAN PODER",
+      "students": 67,
+      "distrito": "08D04"
+    },
+    {
+      "lat": 0.511722203791,
+      "lng": -79.7153055534,
+      "name": "ESCUELA EGB FISCAL RUMIÑAHUI",
+      "students": 75,
+      "distrito": "08D04"
+    },
+    {
+      "lat": 0.912509771226,
+      "lng": -79.1991542865,
+      "name": "ESCUELA DE EDUCACION BASICA  BELLA AURORA",
+      "students": 69,
+      "distrito": "08D02"
+    },
+    {
+      "lat": -0.652225762224,
+      "lng": -90.4073664576,
+      "name": "ESCUELA DE EDUCACIÓN BÁSICA DELIA IBARRA DE VELASCO",
+      "students": 54,
+      "distrito": "20D01"
+    },
+    {
+      "lat": -1.36467851577,
+      "lng": -80.0304897355,
+      "name": "ESCUELA DE EDUCACION BASICA CARLOS MANLIO AGUAYO FAJARDO",
+      "students": 99,
+      "distrito": "09D13"
+    },
+    {
+      "lat": -2.70897990989,
+      "lng": -80.0953042987,
+      "name": "ESCUELA DE EDUCACIÓN BÁSICA FISCAL 13 DE OCTUBRE",
+      "students": 94,
+      "distrito": "09D01"
+    },
+    {
+      "lat": -2.38144102755,
+      "lng": -79.9584352462,
+      "name": "ESCUELA DE EDUCACIÓN BÁSICA FISCAL ANTONIO DE NEBRIJA",
+      "students": 64,
+      "distrito": "09D01"
+    },
+    {
+      "lat": -2.79724183363,
+      "lng": -80.2330277479,
+      "name": "ESCUELA DE EDUCACIÓN BÁSICA FISCAL JOHN F KENNEDY",
+      "students": 84,
+      "distrito": "09D01"
+    },
+    {
+      "lat": -2.59274231622,
+      "lng": -79.6831891806,
+      "name": "ESCUELA DE EDUCACION BASICA 24 DE MAYO",
+      "students": 67,
+      "distrito": "09D12"
+    },
+    {
+      "lat": -2.361514062,
+      "lng": -79.5570749533,
+      "name": "ESCUELA DE EDUCACIÓN BÁSICA JOSE DE LA CUADRA",
+      "students": 54,
+      "distrito": "09D16"
+    },
+    {
+      "lat": -1.7396120079,
+      "lng": -80.3615450804,
+      "name": "ESCUELA DE EDUCACION BASICA CONSTITUCION DEL ECUADOR",
+      "students": 93,
+      "distrito": "09D14"
+    },
+    {
+      "lat": -1.76466696955,
+      "lng": -80.3240017244,
+      "name": "ESCUELA DE EDUCACION BASICA PRUDENCIO MAGALLANES",
+      "students": 61,
+      "distrito": "09D14"
+    },
+    {
+      "lat": -4.25993546498,
+      "lng": -79.7170544032,
+      "name": "UNIDAD EDUCATIVA HIPOLITO AMADOR LOAIZA DAVILA",
+      "students": 67,
+      "distrito": "11D06"
+    },
+    {
+      "lat": -4.14325992982,
+      "lng": -79.2953341048,
+      "name": "UNIDAD EDUCATIVA EMILIANO ABENDAÑO GONZALEZ",
+      "students": 111,
+      "distrito": "11D02"
+    },
+    {
+      "lat": -3.91250001799,
+      "lng": -79.531111129,
+      "name": "UNIDAD EDUCATIVA PEDRO VICTOR FALCONI",
+      "students": 56,
+      "distrito": "11D02"
+    },
+    {
+      "lat": -4.47504341438,
+      "lng": -79.3887975266,
+      "name": "UNIDAD EDUCATIVA  2 DE AGOSTO",
+      "students": 114,
+      "distrito": "11D05"
+    },
+    {
+      "lat": -4.10335441554,
+      "lng": -79.7007596526,
+      "name": "ESCUELA DE EDUCACION BASICA LUIS FERNANDO BRAVO",
+      "students": 65,
+      "distrito": "11D03"
+    },
+    {
+      "lat": -3.99850712653,
+      "lng": -79.6974785362,
+      "name": "ESCUELA DE EDUCACIÓN BÁSICA BERMEO VÁSQUEZ",
+      "students": 92,
+      "distrito": "11D03"
+    },
+    {
+      "lat": -3.37096817086,
+      "lng": -79.4382096307,
+      "name": "UNIDAD EDUCATIVA MACHALA NRO 51",
+      "students": 76,
+      "distrito": "11D08"
+    },
+    {
+      "lat": -4.18555560038,
+      "lng": -80.3693888915,
+      "name": "UNIDAD EDUCATIVA GREGORIO MARAÑON",
+      "students": 98,
+      "distrito": "11D09"
+    },
+    {
+      "lat": -4.44846455617,
+      "lng": -80.3904886085,
+      "name": "ESCUELA DE EDUCACION BASICA JULIO GONZALO HIDALGO GONZÁLEZ",
+      "students": 71,
+      "distrito": "11D09"
+    },
+    {
+      "lat": -4.15561112275,
+      "lng": -80.4307777857,
+      "name": "UNIDAD EDUCATIVA MANGAHURCO",
+      "students": 61,
+      "distrito": "11D09"
+    },
+    {
+      "lat": -4.08725523586,
+      "lng": -80.4816118855,
+      "name": "UNIDAD EDUCATIVA PLAZA LEDESMA",
+      "students": 74,
+      "distrito": "11D09"
+    },
+    {
+      "lat": -1.84602605838,
+      "lng": -79.3423023279,
+      "name": "UNIDAD EDUCATIVA BLANCA VILLAMARIN ORTIZ",
+      "students": 84,
+      "distrito": "12D01"
+    },
+    {
+      "lat": -1.36704236457,
+      "lng": -79.7803809558,
+      "name": "4 DE JUNIO",
+      "students": 57,
+      "distrito": "12D05"
+    },
+    {
+      "lat": -1.33069281334,
+      "lng": -79.632071121,
+      "name": "ESCUELA DE EDUCACION BASICA 28 DE ENERO",
+      "students": 113,
+      "distrito": "12D05"
+    },
+    {
+      "lat": -1.297531282,
+      "lng": -79.5764366717,
+      "name": "ESCUELA DE EDUCACION BASICA CLEMENTE BALLEN",
+      "students": 56,
+      "distrito": "12D05"
+    },
+    {
+      "lat": -1.27551288798,
+      "lng": -79.5852014239,
+      "name": "ESCUELA DE EDUCACION BASICA RIO MATAJE",
+      "students": 65,
+      "distrito": "12D05"
+    },
+    {
+      "lat": -1.27109462513,
+      "lng": -79.7322134149,
+      "name": "ESCUELA DE EDUCACION BASICA SAN SALVADOR",
+      "students": 98,
+      "distrito": "12D05"
+    },
+    {
+      "lat": -1.12674861661,
+      "lng": -79.3457588059,
+      "name": "ESCUELA DE EDUCACION BASICA 1 DE MAYO",
+      "students": 59,
+      "distrito": "12D04"
+    },
+    {
+      "lat": -1.35045172928,
+      "lng": -79.5941457752,
+      "name": "ESCUELA DE EDUCACION BASICA LIBERTADOR BOLIVAR",
+      "students": 82,
+      "distrito": "12D05"
+    },
+    {
+      "lat": -0.0829722238951,
+      "lng": -79.7312222231,
+      "name": "UNIDAD EDUCATIVA ISIDRO JARAMILLO RODRIGUEZ",
+      "students": 91,
+      "distrito": "13D07"
+    },
+    {
+      "lat": -0.141666670687,
+      "lng": -79.8972777764,
+      "name": "UNIDAD EDUCATIVA MANUEL DE JESUS REAL",
+      "students": 79,
+      "distrito": "13D07"
+    },
+    {
+      "lat": -0.485833336904,
+      "lng": -80.0743888885,
+      "name": "UNIDAD EDUCATIVA TRAJANO VITERI MEDRANDA",
+      "students": 57,
+      "distrito": "13D07"
+    },
+    {
+      "lat": -0.502083337362,
+      "lng": -80.0385000038,
+      "name": "UNIDAD EDUCATIVA DEMETRIO ZAMBRANO VERA",
+      "students": 87,
+      "distrito": "13D07"
+    },
+    {
+      "lat": -0.50286111232,
+      "lng": -80.0328888897,
+      "name": "UNIDAD EDUCATIVA PEDRO TOBIAS ZAMBRANO VERA",
+      "students": 68,
+      "distrito": "13D07"
+    },
+    {
+      "lat": -0.421859339385,
+      "lng": -79.7639471894,
+      "name": "ESCUELA DE EDUCACION BASICA CORDILLERA DEL CONDOR",
+      "students": 57,
+      "distrito": "13D07"
+    },
+    {
+      "lat": -0.257598735846,
+      "lng": -79.7876551412,
+      "name": "UNIDAD EDUCATIVA PEDRO ANTONIO VEGA",
+      "students": 57,
+      "distrito": "13D07"
+    },
+    {
+      "lat": -1.3963365502,
+      "lng": -80.4738129624,
+      "name": "NUEVE  DE OCTUBRE",
+      "students": 56,
+      "distrito": "13D03"
+    },
+    {
+      "lat": 0.124694464031,
+      "lng": -79.6725277774,
+      "name": "24 DE SEPTIEMBRE",
+      "students": 78,
+      "distrito": "13D10"
+    },
+    {
+      "lat": 0.118971196567,
+      "lng": -79.7585939358,
+      "name": "BELLAVISTA",
+      "students": 87,
+      "distrito": "13D10"
+    },
+    {
+      "lat": 0.149861079667,
+      "lng": -79.8017222215,
+      "name": "TENIENTE HUGO ORTIZ",
+      "students": 76,
+      "distrito": "13D10"
+    },
+    {
+      "lat": -0.352763223353,
+      "lng": -80.4130568287,
+      "name": "ESCUELA DE EDUCACION BASICA MARISCAL SUCRE",
+      "students": 61,
+      "distrito": "13D11"
+    },
+    {
+      "lat": -0.452187898506,
+      "lng": -80.3108017413,
+      "name": "LUIS FELIPE BORJA",
+      "students": 61,
+      "distrito": "13D11"
+    },
+    {
+      "lat": 0.1910081183,
+      "lng": -79.001729204,
+      "name": "UNIDAD EDUCATIVA RODOLFO ESTRADA",
+      "students": 52,
+      "distrito": "17D12"
+    },
+    {
+      "lat": 0.220397361742,
+      "lng": -79.0351167518,
+      "name": "UNIDAD EDUCATIVA SALCEDO LINDO",
+      "students": 65,
+      "distrito": "17D12"
+    },
+    {
+      "lat": 0.207877094007,
+      "lng": -79.3126722392,
+      "name": "UNIDAD EDUCATIVA SAN JACINTO",
+      "students": 113,
+      "distrito": "17D12"
+    },
+    {
+      "lat": 0.00515032179596,
+      "lng": -79.0423321996,
+      "name": "UNIDAD EDUCATIVA JAIME HURTADO GONZALEZ",
+      "students": 66,
+      "distrito": "17D12"
+    },
+    {
+      "lat": -2.02688390237,
+      "lng": -80.4741715703,
+      "name": "ESCUELA DE EDUCACION BASICA 24 DE MAYO",
+      "students": 65,
+      "distrito": "24D01"
+    },
+    {
+      "lat": -1.72890701042,
+      "lng": -80.7832250034,
+      "name": "ESCUELA DE EDUCACION BASICA VICTOR EMILIO ESTRADA ICAZA",
+      "students": 111,
+      "distrito": "24D01"
+    },
+    {
+      "lat": -2.19377105637,
+      "lng": -80.4510307373,
+      "name": "ESCUELA DE EDUCACION BASICA ABDON CALDERON",
+      "students": 70,
+      "distrito": "24D01"
+    },
+    {
+      "lat": -3.40172097134,
+      "lng": -79.1724415306,
+      "name": "CECIB DE EDUCACIÓN BÁSICA NUEVO SUSUDEL",
+      "students": 110,
+      "distrito": "01D05"
+    },
+    {
+      "lat": -3.4040277647,
+      "lng": -79.1847778203,
+      "name": "UNIDAD EDUCATIVA  SUSUDEL",
+      "students": 108,
+      "distrito": "01D05"
+    },
+    {
+      "lat": 1.11963890639,
+      "lng": -78.3650555549,
+      "name": "PLAYA GRANDE",
+      "students": 71,
+      "distrito": "04D01"
+    },
+    {
+      "lat": 1.18515703807,
+      "lng": -78.4875382879,
+      "name": "ADOLFO JURADO GONZALEZ",
+      "students": 57,
+      "distrito": "04D01"
+    },
+    {
+      "lat": 1.17415932645,
+      "lng": -78.4519447412,
+      "name": "LA COROZALA",
+      "students": 54,
+      "distrito": "04D01"
+    },
+    {
+      "lat": -2.47110521356,
+      "lng": -78.6108971651,
+      "name": "UNIDAD EDUCATIVA COMUNITARIA INTERCULTURAL BILINGUE CANTÓN  ALAUSI",
+      "students": 65,
+      "distrito": "06D02"
+    },
+    {
+      "lat": -2.48223057439,
+      "lng": -78.6098167225,
+      "name": "UNIDAD EDUCATIVA SAN RAFAEL",
+      "students": 94,
+      "distrito": "06D02"
+    },
+    {
+      "lat": -2.33851374072,
+      "lng": -78.841709375,
+      "name": "UNIDAD EDUCATIVA GENARO MONCAYO",
+      "students": 118,
+      "distrito": "06D02"
+    },
+    {
+      "lat": -1.77357827048,
+      "lng": -78.9920130496,
+      "name": "UNIDAD EDUCATIVA 28 DE AGOSTO",
+      "students": 84,
+      "distrito": "06D04"
+    },
+    {
+      "lat": -2.11604584238,
+      "lng": -78.6019746389,
+      "name": "GUAZAN SANTA CLARITA",
+      "students": 81,
+      "distrito": "06D04"
+    },
+    {
+      "lat": -1.88007266621,
+      "lng": -78.5090038977,
+      "name": "UNIDAD EDUCATIVA INTERCULTURAL BILINGUE RIO GUAMBOYA",
+      "students": 69,
+      "distrito": "06D01"
+    },
+    {
+      "lat": 0.512222246635,
+      "lng": -78.414116891,
+      "name": "ABELARDO MORAN MUÑOZ",
+      "students": 65,
+      "distrito": "10D03"
+    },
+    {
+      "lat": 0.304485718527,
+      "lng": -78.3902760254,
+      "name": "ESCUELA DE EDUCACION BASICA JAIME ROLDOS AGUILERA",
+      "students": 64,
+      "distrito": "10D02"
+    },
+    {
+      "lat": 0.247728782363,
+      "lng": -78.3946065687,
+      "name": "UNIDAD EDUCATIVA INTERCULTURAL BILINGUE SAMINAY EL LEGADO",
+      "students": 95,
+      "distrito": "10D02"
+    },
+    {
+      "lat": -3.86071569403,
+      "lng": -79.1724806007,
+      "name": "ESCUELA DE EDUCACION BASICA GONZALO PIZARRO",
+      "students": 56,
+      "distrito": "11D01"
+    },
+    {
+      "lat": -3.85997247569,
+      "lng": -79.1697859516,
+      "name": "UNIDAD EDUCATIVA LIBERTADOR BOLIVAR",
+      "students": 75,
+      "distrito": "11D01"
+    },
+    {
+      "lat": -3.82601547567,
+      "lng": -79.229011054,
+      "name": "UNIDAD EDUCATIVA COMUNITARIA INTERCULTURAL BILINGÜE CARCHI",
+      "students": 92,
+      "distrito": "11D01"
+    },
+    {
+      "lat": -3.33093355829,
+      "lng": -78.4603468119,
+      "name": "ESCUELA DE EDUCACION BASICA INTERCULTURAL BILINGUE NUNKUI",
+      "students": 108,
+      "distrito": "14D04"
+    },
+    {
+      "lat": -2.0122222508,
+      "lng": -77.8297221954,
+      "name": "CECIB DE EDUCACION BASICA MATI",
+      "students": 86,
+      "distrito": "14D02"
+    },
+    {
+      "lat": -3.12441667786,
+      "lng": -78.4472221978,
+      "name": "ESCUELA DE EDUCACIÓN BÁSICA 2 DE AGOSTO",
+      "students": 82,
+      "distrito": "14D06"
+    },
+    {
+      "lat": -2.71803847556,
+      "lng": -77.9079360945,
+      "name": "CECIB DE EDUCACIÓN BÁSICA FISCOMISIONAL SAN JUAN BOSCO",
+      "students": 59,
+      "distrito": "14D03"
+    },
+    {
+      "lat": -2.21963892585,
+      "lng": -78.2486944393,
+      "name": "ESCUELA DE EDUCACIÓN BÁSICA PEDRO VICENTE MALDONADO",
+      "students": 78,
+      "distrito": "14D01"
+    },
+    {
+      "lat": -2.25955558302,
+      "lng": -78.0309444076,
+      "name": "CECIB DE EDUCACION BASICA JOSE MEJIA LEQUERICA",
+      "students": 61,
+      "distrito": "14D01"
+    },
+    {
+      "lat": -2.52417248747,
+      "lng": -77.7319071845,
+      "name": "CECIB DE EDUCACION BASICA SAN MIGUEL",
+      "students": 60,
+      "distrito": "14D01"
+    },
+    {
+      "lat": -2.60708331055,
+      "lng": -77.7784722026,
+      "name": "CECIB DE EDUCACION BASICA SANTA CECILIA",
+      "students": 91,
+      "distrito": "14D01"
+    },
+    {
+      "lat": -2.62516669556,
+      "lng": -77.7983611082,
+      "name": "UNIDAD EDUCATIVA COMUNITARIA INTERCULTURAL BILINGUE ISIDORO BIGATTI",
+      "students": 89,
+      "distrito": "14D01"
+    },
+    {
+      "lat": -2.65933332386,
+      "lng": -77.7982499617,
+      "name": "UNIDAD EDUCATIVA COMUNITARIA INTERCULTURAL BILINGÜE PADRE ANGEL ROUBY",
+      "students": 87,
+      "distrito": "14D01"
+    },
+    {
+      "lat": -2.89716664481,
+      "lng": -78.2391111386,
+      "name": "CECIB DE EDUCACIÓN BÁSICA CHARIP",
+      "students": 59,
+      "distrito": "14D06"
+    },
+    {
+      "lat": -2.93894442159,
+      "lng": -78.2375278061,
+      "name": "CECIB DE EDUCACIÓN BÁSICA YUWIM",
+      "students": 56,
+      "distrito": "14D06"
+    },
+    {
+      "lat": -2.50025769446,
+      "lng": -78.2464171418,
+      "name": "ESCUELA DE EDUCACIÓN BÁSICA 8 DE DICIEMBRE",
+      "students": 103,
+      "distrito": "14D03"
+    },
+    {
+      "lat": -2.60737294179,
+      "lng": -76.9327546671,
+      "name": "CECIB DE EDUCACIÓN BASICA CHIKUISH",
+      "students": 66,
+      "distrito": "14D05"
+    },
+    {
+      "lat": -2.46369442436,
+      "lng": -77.0405833446,
+      "name": "CECIB DE EDUCACION BASICA CINCO DE AGOSTO",
+      "students": 58,
+      "distrito": "14D05"
+    },
+    {
+      "lat": -2.55069440436,
+      "lng": -77.0883610853,
+      "name": "CECIB  DE  EDUCACION BASICA KAITIAN",
+      "students": 52,
+      "distrito": "14D05"
+    },
+    {
+      "lat": -2.75622219309,
+      "lng": -77.2208611133,
+      "name": "CECIB  DE  EDUCACION BASICA RUMIÑAHUI",
+      "students": 70,
+      "distrito": "14D05"
+    },
+    {
+      "lat": -2.72025002612,
+      "lng": -77.242861079,
+      "name": "CECIB  DE  EDUCACIÓN BASICA SAN PABLO JUWAU",
+      "students": 61,
+      "distrito": "14D05"
+    },
+    {
+      "lat": -2.40519441713,
+      "lng": -77.3658055306,
+      "name": "CECIB DE EDUCACIÓN BASICA SAN PEDRO",
+      "students": 111,
+      "distrito": "14D05"
+    },
+    {
+      "lat": -2.61658329672,
+      "lng": -76.9139444369,
+      "name": "CECIB DE EDUCACIÓN BASICA TANCHIM",
+      "students": 56,
+      "distrito": "14D05"
+    },
+    {
+      "lat": -2.69527533696,
+      "lng": -77.0882020736,
+      "name": "CECIB DE EDUCACIÓN BASICA UYUNKAR",
+      "students": 62,
+      "distrito": "14D05"
+    },
+    {
+      "lat": -2.5465000282,
+      "lng": -77.1960833245,
+      "name": "UNIDAD EDUCATIVA COMUNITARIA INTERCULTURAL BILINGUE FISCOMISIONAL ACHUAR",
+      "students": 96,
+      "distrito": "14D05"
+    },
+    {
+      "lat": -2.16191663461,
+      "lng": -77.4847500003,
+      "name": "CECIB DE EDUCACION BASICA CONDOR",
+      "students": 92,
+      "distrito": "14D05"
+    },
+    {
+      "lat": -2.20086109295,
+      "lng": -77.5842221972,
+      "name": "CECIB DE EDUCACIÓN BASICA TIMIAS NARANKAS",
+      "students": 51,
+      "distrito": "14D05"
+    },
+    {
+      "lat": -2.16602773885,
+      "lng": -77.5761666495,
+      "name": "UNIDAD EDUCATIVA COMUNITARIA INTERCULTURAL BILINGÜE RIO NAPO",
+      "students": 89,
+      "distrito": "14D05"
+    },
+    {
+      "lat": -2.46425014499,
+      "lng": -77.6012960603,
+      "name": "CECIB  DE  EDUCACIÓN BASICA SAN FRANCISCO",
+      "students": 51,
+      "distrito": "14D05"
+    },
+    {
+      "lat": -2.42347222925,
+      "lng": -77.3902777959,
+      "name": "ESCUELA  DE EDUCACION BASICA GENERAL PROAÑO",
+      "students": 72,
+      "distrito": "14D05"
+    },
+    {
+      "lat": -2.69850002461,
+      "lng": -77.5382222368,
+      "name": "CECIB DE EDUCACIÓN BASICA ANTONIO CHUMAP",
+      "students": 67,
+      "distrito": "14D05"
+    },
+    {
+      "lat": -2.86541668772,
+      "lng": -77.4868610949,
+      "name": "CECIB DE EDUCACIÓN BASICA ASAP",
+      "students": 102,
+      "distrito": "14D05"
+    },
+    {
+      "lat": -2.69483328687,
+      "lng": -77.5097777383,
+      "name": "CECIB DE EDUCACION BASICA MARIA JUSA",
+      "students": 68,
+      "distrito": "14D05"
+    },
+    {
+      "lat": -2.88891663883,
+      "lng": -77.5694721808,
+      "name": "CECIB DE EDUCACIÓN BÁSICA MAYOR BOLIVAR GALLARDO",
+      "students": 67,
+      "distrito": "14D05"
+    },
+    {
+      "lat": -2.72633332741,
+      "lng": -77.6777222038,
+      "name": "CECIB DE EDUCACIÓN BÁSICA RIO KUSUIM",
+      "students": 76,
+      "distrito": "14D05"
+    },
+    {
+      "lat": -2.66741662688,
+      "lng": -77.4979166322,
+      "name": "CECIB DE EDUCACION BASICA SAN JUAN",
+      "students": 76,
+      "distrito": "14D05"
+    },
+    {
+      "lat": -2.63244444549,
+      "lng": -77.6934166609,
+      "name": "CECIB DE EDUCACIÓN BÁSICA SANTA ISABEL",
+      "students": 58,
+      "distrito": "14D05"
+    },
+    {
+      "lat": -2.90667301342,
+      "lng": -77.5800137298,
+      "name": "UNIDAD EDUCATIVA SAN MIGUEL",
+      "students": 80,
+      "distrito": "14D05"
+    },
+    {
+      "lat": -2.79374996667,
+      "lng": -77.7965833084,
+      "name": "CECIB DE EDUCACION BASICA NATALIA CHIRIAP",
+      "students": 52,
+      "distrito": "14D01"
+    },
+    {
+      "lat": -2.82018950031,
+      "lng": -77.7723253746,
+      "name": "CECIB DE EDUCACIÓN BÁSICA OTTO RIEDMAYER",
+      "students": 91,
+      "distrito": "14D06"
+    },
+    {
+      "lat": -2.86927780603,
+      "lng": -77.7392499833,
+      "name": "CECIB DE EDUCACIÓN BÁSICA RIO MANKUSAS",
+      "students": 62,
+      "distrito": "14D06"
+    },
+    {
+      "lat": -2.834444414,
+      "lng": -77.7631666782,
+      "name": "CECIB DE EDUCACIÓN BÁSICA ROBERTO SHARIAN",
+      "students": 57,
+      "distrito": "14D06"
+    },
+    {
+      "lat": -2.82291667429,
+      "lng": -77.771361125,
+      "name": "CECIB DE EDUCACIÓN BÁSICA SANTA ANA",
+      "students": 89,
+      "distrito": "14D06"
+    },
+    {
+      "lat": -2.92652776909,
+      "lng": -77.7411388622,
+      "name": "ESCUELA DE EDUCACIÓN BÁSICA PUERTO MORONA",
+      "students": 69,
+      "distrito": "14D06"
+    },
+    {
+      "lat": -0.712620955747,
+      "lng": -77.7193835195,
+      "name": "CECIB PACHAKUTIK",
+      "students": 66,
+      "distrito": "15D01"
+    },
+    {
+      "lat": -1.150755715,
+      "lng": -77.7327252695,
+      "name": "CENTRO EDU COMUNITARIO INTER BILINGUE EDU BASICA PASCUAL DAHUA VARGAS",
+      "students": 83,
+      "distrito": "15D01"
+    },
+    {
+      "lat": -0.578921335552,
+      "lng": -77.8678417224,
+      "name": "GIL RAMIREZ DAVALOS",
+      "students": 52,
+      "distrito": "15D02"
+    },
+    {
+      "lat": -0.378164589491,
+      "lng": -78.140921161,
+      "name": "GENERAL QUIS QUIS",
+      "students": 73,
+      "distrito": "15D02"
+    },
+    {
+      "lat": -0.904222233626,
+      "lng": -77.4551856523,
+      "name": "TELMO TAPUY",
+      "students": 59,
+      "distrito": "15D01"
+    },
+    {
+      "lat": -0.977988968598,
+      "lng": -77.3321320912,
+      "name": "UNIDAD EDUCATIVA COMUNITARIA INTERCULT BILINGÜE PEDRO GREFA SHIGUANGO",
+      "students": 59,
+      "distrito": "15D01"
+    },
+    {
+      "lat": -0.569561739288,
+      "lng": -75.9660657965,
+      "name": "FRAY GASPAR DE CARVAJAL",
+      "students": 52,
+      "distrito": "22D03"
+    },
+    {
+      "lat": -1.03531680447,
+      "lng": -75.7786695385,
+      "name": "NAMPAWE ONKYERE YATEWE",
+      "students": 58,
+      "distrito": "22D03"
+    },
+    {
+      "lat": -0.667757251571,
+      "lng": -75.6750821252,
+      "name": "JOSE MARIA PLACIDO CAAMAÑO",
+      "students": 66,
+      "distrito": "22D03"
+    },
+    {
+      "lat": -0.805230974449,
+      "lng": -75.6690818886,
+      "name": "RIO LLANCHAMA",
+      "students": 60,
+      "distrito": "22D03"
+    },
+    {
+      "lat": -0.174500373423,
+      "lng": -76.9973664185,
+      "name": "RIO SALVADOR",
+      "students": 118,
+      "distrito": "22D01"
+    },
+    {
+      "lat": -0.155319282799,
+      "lng": -77.0791232012,
+      "name": "VALERIO GREFA",
+      "students": 92,
+      "distrito": "22D01"
+    },
+    {
+      "lat": -0.681444453961,
+      "lng": -77.2391111065,
+      "name": "ESCUELA DE EDUCACION BASICA MONS ANTONIO CABRI",
+      "students": 90,
+      "distrito": "22D02"
+    },
+    {
+      "lat": -0.878388052209,
+      "lng": -77.3693484097,
+      "name": "CAPITAN PABLO VILLARRUEL FUENTES",
+      "students": 118,
+      "distrito": "22D02"
+    },
+    {
+      "lat": -0.900857054116,
+      "lng": -77.4289803901,
+      "name": "PADRE FRANCISCO TRAMAROLLO",
+      "students": 77,
+      "distrito": "22D02"
+    },
+    {
+      "lat": -0.834277772007,
+      "lng": -77.4814444082,
+      "name": "VENANCIO AJÓN",
+      "students": 62,
+      "distrito": "22D02"
+    },
+    {
+      "lat": -0.795305555463,
+      "lng": -76.8116111134,
+      "name": "ESCUELA DE EDUCACION BASICA EUGENIO ESPEJO",
+      "students": 82,
+      "distrito": "22D02"
+    },
+    {
+      "lat": -0.693527757557,
+      "lng": -76.9461944024,
+      "name": "FEDERICO GONZALES SUAREZ",
+      "students": 105,
+      "distrito": "22D02"
+    },
+    {
+      "lat": -0.67933335562,
+      "lng": -76.8034166667,
+      "name": "MILTON LENIN PATIÑO CHUVA",
+      "students": 113,
+      "distrito": "22D02"
+    },
+    {
+      "lat": -0.624752964993,
+      "lng": -76.6590078857,
+      "name": "MODESTO JORDAN  ILLANES VARGAS",
+      "students": 57,
+      "distrito": "22D02"
+    },
+    {
+      "lat": -0.487078527963,
+      "lng": -76.310262765,
+      "name": "SILVERIO TAPUY",
+      "students": 79,
+      "distrito": "22D02"
+    },
+    {
+      "lat": -0.257461143424,
+      "lng": -77.1447944719,
+      "name": "CECIB  RIO ACORANO",
+      "students": 117,
+      "distrito": "22D02"
+    },
+    {
+      "lat": -0.586249962754,
+      "lng": -76.775527753,
+      "name": "UNIDAD EDUCATIVA DOCTOR BENJAMIN CARRION",
+      "students": 113,
+      "distrito": "22D02"
+    },
+    {
+      "lat": -1.42005181183,
+      "lng": -77.7067093864,
+      "name": "CENTRO EDUCATIVO COMUNITARIO INTERCULTURAL BILINGUE ILIPI",
+      "students": 88,
+      "distrito": "16D01"
+    },
+    {
+      "lat": -1.61114214581,
+      "lng": -75.9920764889,
+      "name": "LORO KACHI",
+      "students": 107,
+      "distrito": "16D01"
+    },
+    {
+      "lat": -1.21586299664,
+      "lng": -77.3813460023,
+      "name": "UNIDAD EDUCATIVA DEL MILENIO INTERCULTURAL BILINGÜE TOÑE",
+      "students": 100,
+      "distrito": "16D02"
+    },
+    {
+      "lat": -1.01926509934,
+      "lng": -77.1650623028,
+      "name": "UNIDAD EDUCATIVA INTERCULTURAL BILINGUE NOGUI TOGORO",
+      "students": 95,
+      "distrito": "16D02"
+    },
+    {
+      "lat": -1.47420879929,
+      "lng": -77.650060497,
+      "name": "UNIDAD EDUCATIVA INTERCULTURAL BILINGUE YACHANA WASI",
+      "students": 113,
+      "distrito": "16D02"
+    },
+    {
+      "lat": -1.40412932216,
+      "lng": -77.8631476813,
+      "name": "UNIDAD EDUCATIVA COMUNITARIA INTERCULTURAL BILINGÜE SAN RAMON",
+      "students": 95,
+      "distrito": "16D01"
+    },
+    {
+      "lat": -2.17038133539,
+      "lng": -77.3165588029,
+      "name": "CECIB DE EDUCACION BASICA ENTSAKUA",
+      "students": 57,
+      "distrito": "16D01"
+    },
+    {
+      "lat": -2.23648891767,
+      "lng": -77.2388830408,
+      "name": "CECIB DE EDUCACION BASICA GUARANI",
+      "students": 64,
+      "distrito": "16D01"
+    },
+    {
+      "lat": -2.44136114166,
+      "lng": -76.9166388613,
+      "name": "CENTRO EDUCATIVO COMUNITARIO INTERCULTURAL BILINGÜE DE EDUCACION BASICA SAANT",
+      "students": 67,
+      "distrito": "16D01"
+    },
+    {
+      "lat": -2.13487719727,
+      "lng": -77.3794608771,
+      "name": "ESCUELA DE EDUCACION BASICA INTERCULTURAL BILINGUE MANKU URKU",
+      "students": 86,
+      "distrito": "16D01"
+    },
+    {
+      "lat": -2.22000831216,
+      "lng": -76.8130883141,
+      "name": "KAPIRNA",
+      "students": 95,
+      "distrito": "16D01"
+    },
+    {
+      "lat": -1.86615904908,
+      "lng": -76.8815121412,
+      "name": "LUIS ARIAS GUERRA",
+      "students": 95,
+      "distrito": "16D01"
+    },
+    {
+      "lat": -2.43772633788,
+      "lng": -77.0305295411,
+      "name": "UNIDAD EDUCATIVA COMUNITARIA INTERCULTURAL BILINGUE RIO PASTAZA",
+      "students": 62,
+      "distrito": "16D01"
+    },
+    {
+      "lat": -2.13547044785,
+      "lng": -77.3757499129,
+      "name": "CENTRO EDUCATIVO COMUNITARIO INTERCULTURAL BILINGÜE DE EDUCACION BASICA SANTIAK",
+      "students": 69,
+      "distrito": "16D01"
+    },
+    {
+      "lat": -2.07258800158,
+      "lng": -77.5234700006,
+      "name": "PASUCA",
+      "students": 115,
+      "distrito": "16D01"
+    },
+    {
+      "lat": -1.34564096733,
+      "lng": -77.922105272,
+      "name": "ESCUELA DE EDUCACION BASICA JOHN F KENNEDY",
+      "students": 73,
+      "distrito": "16D01"
+    },
+    {
+      "lat": 0.14329798388,
+      "lng": -77.3367539415,
+      "name": "CHARLES DARWIN",
+      "students": 68,
+      "distrito": "21D01"
+    },
+    {
+      "lat": 0.157745204673,
+      "lng": -77.2128648183,
+      "name": "JUAN LUIS ENTSAKUA NAJARAIP",
+      "students": 61,
+      "distrito": "21D01"
+    },
+    {
+      "lat": -0.277462368338,
+      "lng": -76.1911046745,
+      "name": "UNIDAD EDUCATIVA INTERCULTURAL BILINGUE SAN PEDRO",
+      "students": 62,
+      "distrito": "21D03"
+    },
+    {
+      "lat": 0.124586136113,
+      "lng": -77.4310938652,
+      "name": "RIO COFANES",
+      "students": 56,
+      "distrito": "21D01"
+    },
+    {
+      "lat": -0.0176554598147,
+      "lng": -76.7799077768,
+      "name": "ESCUELA DE EDUCACION BASICA SAN MIGUEL DE BOLIVAR",
+      "students": 100,
+      "distrito": "21D02"
+    },
+    {
+      "lat": -0.0345984946561,
+      "lng": -76.7920153533,
+      "name": "LUIS MONTALUISA",
+      "students": 52,
+      "distrito": "21D02"
+    },
+    {
+      "lat": -0.0429718783876,
+      "lng": -77.0464922594,
+      "name": "SAN JOSE DEL RIO PUSINO",
+      "students": 61,
+      "distrito": "21D02"
+    },
+    {
+      "lat": 0.115619143595,
+      "lng": -76.7122620832,
+      "name": "TRES PALMAS",
+      "students": 55,
+      "distrito": "21D02"
+    },
+    {
+      "lat": 0.0503888797019,
+      "lng": -76.3054166307,
+      "name": "ASAAD BUCARAM",
+      "students": 51,
+      "distrito": "21D03"
+    },
+    {
+      "lat": 0.424453545051,
+      "lng": -76.2887460347,
+      "name": "UNIDAD EDUCATIVA PAZ",
+      "students": 65,
+      "distrito": "21D03"
+    },
+    {
+      "lat": -0.475765950023,
+      "lng": -76.3139618378,
+      "name": "CE COMUNITARIO INTERCULTURAL BILINGUE LORENZO DE GARAICOA",
+      "students": 81,
+      "distrito": "21D04"
+    },
+    {
+      "lat": -0.422339158685,
+      "lng": -76.5386938728,
+      "name": "UE COMUNITARIO INTERCULTURAL BILINGUE GENERAL MIRES",
+      "students": 96,
+      "distrito": "21D04"
+    },
+    {
+      "lat": -1.38307910995,
+      "lng": -78.8349122406,
+      "name": "ESCUELA DE EDUCACIÓN BÁSICA COLEGIO MANUELA CAÑIZARES",
+      "students": 61,
+      "distrito": "18D02"
+    },
+    {
+      "lat": -1.40202965466,
+      "lng": -78.3002325502,
+      "name": "UNIDAD EDUCATIVA PUERTA DEL DORADO",
+      "students": 105,
+      "distrito": "18D03"
+    },
+    {
+      "lat": -1.3045850748,
+      "lng": -78.4055880948,
+      "name": "ESCUELA DE EDUCACION BASICA REPUBLICA DE SUIZA",
+      "students": 118,
+      "distrito": "18D04"
+    },
+    {
+      "lat": -1.30386657353,
+      "lng": -78.4012515985,
+      "name": "UNIDAD EDUCATIVA EL TRIUNFO",
+      "students": 109,
+      "distrito": "18D04"
+    },
+    {
+      "lat": -4.81646558087,
+      "lng": -79.2905162865,
+      "name": "UNIDAD EDUCATIVA LUIS TUFIÑO",
+      "students": 93,
+      "distrito": "19D03"
+    },
+    {
+      "lat": -3.64697223643,
+      "lng": -78.6951666518,
+      "name": "UNIDAD EDUCATIVA CARMEN VALDIVIEZO",
+      "students": 51,
+      "distrito": "19D04"
+    },
+    {
+      "lat": -3.59877779328,
+      "lng": -78.6869721936,
+      "name": "UNIDAD EDUCATIVA COMUNITARIA INTERCULTURAL BILINGUE TUTIN",
+      "students": 88,
+      "distrito": "19D04"
+    },
+    {
+      "lat": -4.61239165383,
+      "lng": -78.9535316244,
+      "name": "UNIDAD EDUCATIVA HERNANDO DE BENAVENTE",
+      "students": 115,
+      "distrito": "19D03"
+    },
+    {
+      "lat": -4.74991085074,
+      "lng": -79.0526235255,
+      "name": "UNIDAD EDUCATIVA FERNANDO DAQUILEMA",
+      "students": 86,
+      "distrito": "19D03"
+    },
+    {
+      "lat": -3.52943381217,
+      "lng": -78.9512997637,
+      "name": "UNIDAD EDUCATIVA COMUNITARIA INTERCULTURAL BILINGÜE GENERAL MIRANDA",
+      "students": 93,
+      "distrito": "19D01"
+    },
+    {
+      "lat": -3.88342325757,
+      "lng": -79.0901316442,
+      "name": "UNIDAD EDUCATIVA COMUNITARIA INTERCULTURAL BILINGÜE BERNARDINO ECHEVERRIA",
+      "students": 88,
+      "distrito": "19D01"
+    },
+    {
+      "lat": -3.84546935465,
+      "lng": -79.1203011735,
+      "name": "UNIDAD EDUCATIVA    IMBANA",
+      "students": 82,
+      "distrito": "19D01"
+    },
+    {
+      "lat": -3.96596274705,
+      "lng": -79.0575419081,
+      "name": "UNIDAD EDUCATIVA VICTOR MANUEL RODRIGUEZ PEÑARRETA",
+      "students": 76,
+      "distrito": "19D01"
+    }
+  ]
+}
