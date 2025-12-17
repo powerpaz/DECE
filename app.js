@@ -36,7 +36,10 @@ const ASSUMED_SPEED_KMH = 30;
 
 // ===== NUEVO: Estado de edición =====
 let editMode = false;
+let addMode = false; // NUEVO: Modo añadir buffers
 let editableBuffers = new Map();
+let customBuffers = []; // NUEVO: Buffers personalizados añadidos
+let customBufferCounter = 0; // NUEVO: Contador para IDs únicos
 let globalData = null;
 let metricsPanel = null;
 
@@ -93,11 +96,22 @@ function setupEditControls() {
   }
 
   editBtn.addEventListener("click", toggleEditMode);
+  
+  // NUEVO: Botón añadir buffers
+  const addBtn = document.getElementById("btnAddBuffers");
+  if (addBtn) {
+    addBtn.addEventListener("click", toggleAddMode);
+  }
 }
 
 function toggleEditMode() {
   editMode = !editMode;
   const btn = document.getElementById("btnEditBuffers");
+  
+  // Desactivar modo añadir si está activo
+  if (editMode && addMode) {
+    toggleAddMode();
+  }
   
   if (editMode) {
     btn.classList.add("active");
@@ -108,6 +122,330 @@ function toggleEditMode() {
     disableBufferEditing();
     closeMetricsPanel();
     showNotification("Modo edición desactivado.", "info");
+  }
+}
+
+// NUEVO: Función para modo añadir buffers
+function toggleAddMode() {
+  addMode = !addMode;
+  const btn = document.getElementById("btnAddBuffers");
+  
+  // Desactivar modo edición si está activo
+  if (addMode && editMode) {
+    toggleEditMode();
+  }
+  
+  if (addMode) {
+    btn.classList.add("active");
+    enableAddBufferMode();
+    showNotification("➕ Modo añadir activado. Haz click en el mapa para crear un buffer.", "info");
+  } else {
+    btn.classList.remove("active");
+    disableAddBufferMode();
+    showNotification("Modo añadir desactivado.", "info");
+  }
+}
+
+function enableAddBufferMode() {
+  map.getContainer().style.cursor = 'crosshair';
+  
+  // Añadir evento click al mapa
+  map.on('click', onMapClickAddBuffer);
+}
+
+function disableAddBufferMode() {
+  map.getContainer().style.cursor = '';
+  
+  // Remover evento click del mapa
+  map.off('click', onMapClickAddBuffer);
+}
+
+function onMapClickAddBuffer(e) {
+  if (!addMode) return;
+  
+  const lat = e.latlng.lat;
+  const lng = e.latlng.lng;
+  
+  // Crear nuevo buffer personalizado
+  createCustomBuffer(lat, lng);
+}
+
+function createCustomBuffer(lat, lng) {
+  customBufferCounter++;
+  const bufferId = `custom_${customBufferCounter}`;
+  
+  // Crear círculo en el mapa
+  const circle = L.circle([lat, lng], {
+    radius: BUFFER_RADIUS_M,
+    color: '#a371f7', // Color púrpura para buffers personalizados
+    fillColor: '#a371f7',
+    weight: 2,
+    opacity: 0.7,
+    fillOpacity: 0.15,
+    renderer: canvasRenderer
+  });
+  
+  circle.addTo(layers.buffers);
+  
+  // Crear objeto buffer personalizado
+  const customBuffer = {
+    id: bufferId,
+    circle: circle,
+    lat: lat,
+    lng: lng,
+    originalPos: { lat, lng },
+    currentPos: { lat, lng },
+    isCustom: true,
+    isDragging: false,
+    name: `Buffer Personalizado #${customBufferCounter}`
+  };
+  
+  // Guardar en array de buffers personalizados
+  customBuffers.push(customBuffer);
+  
+  // Hacer el buffer clickeable para ver métricas
+  circle.on('click', (e) => {
+    L.DomEvent.stopPropagation(e);
+    showCustomBufferMetrics(customBuffer);
+  });
+  
+  // Calcular métricas iniciales
+  const metrics = calculateBufferMetrics({ lat, lng }, BUFFER_RADIUS_M);
+  
+  showNotification(
+    `✓ Buffer creado: ${metrics.iesCount} IEs, ${metrics.totalStudents.toLocaleString()} estudiantes`,
+    "success"
+  );
+  
+  // Hacer arrastrable si está en modo edición
+  if (editMode) {
+    makeCustomBufferDraggable(circle, customBuffer);
+  }
+}
+
+function showCustomBufferMetrics(buffer) {
+  const currentPos = buffer.circle.getLatLng();
+  const metrics = calculateBufferMetrics(currentPos, BUFFER_RADIUS_M);
+  
+  if (!metricsPanel) {
+    metricsPanel = document.createElement('div');
+    metricsPanel.id = 'bufferMetricsPanel';
+    metricsPanel.className = 'buffer-metrics-panel';
+    document.body.appendChild(metricsPanel);
+  }
+  
+  metricsPanel.innerHTML = `
+    <div class="metrics-header">
+      <h3>📊 Métricas del Buffer Personalizado</h3>
+      <button class="close-btn" onclick="closeMetricsPanel()">×</button>
+    </div>
+    <div class="metrics-content">
+      <div class="metrics-nucleo">
+        <strong>${escapeHTML(buffer.name)}</strong>
+        <div class="coords-info">
+          <span>Posición: ${currentPos.lat.toFixed(5)}, ${currentPos.lng.toFixed(5)}</span>
+        </div>
+        <div class="custom-buffer-badge">
+          <span style="color: #a371f7;">🎨 Buffer Personalizado</span>
+        </div>
+      </div>
+      
+      <div class="metrics-stats">
+        <div class="metric-item highlight">
+          <div class="metric-icon">🎯</div>
+          <div class="metric-info">
+            <div class="metric-value">${metrics.iesCount}</div>
+            <div class="metric-label">IEs Cubiertas</div>
+          </div>
+        </div>
+        
+        <div class="metric-item">
+          <div class="metric-icon">👥</div>
+          <div class="metric-info">
+            <div class="metric-value">${metrics.totalStudents.toLocaleString()}</div>
+            <div class="metric-label">Estudiantes</div>
+          </div>
+        </div>
+        
+        <div class="metric-item">
+          <div class="metric-icon">👨‍🏫</div>
+          <div class="metric-info">
+            <div class="metric-value">${metrics.profNecesarios}</div>
+            <div class="metric-label">Prof. Necesarios</div>
+          </div>
+        </div>
+        
+        <div class="metric-item">
+          <div class="metric-icon">📏</div>
+          <div class="metric-info">
+            <div class="metric-value">${(BUFFER_RADIUS_M/1000).toFixed(1)} km</div>
+            <div class="metric-label">Radio Buffer</div>
+          </div>
+        </div>
+      </div>
+      
+      ${metrics.iesList.length > 0 ? `
+        <div class="metrics-list">
+          <h4>Instituciones Educativas Cubiertas:</h4>
+          <div class="ie-list">
+            ${metrics.iesList.map(ie => `
+              <div class="ie-item">
+                <div class="ie-name">${escapeHTML(ie.name)}</div>
+                <div class="ie-details">
+                  <span class="ie-dist">${(ie.dist/1000).toFixed(2)} km</span>
+                  <span class="ie-students">${ie.students} est.</span>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : '<div class="no-ies">⚠️ No hay IEs dentro de este buffer</div>'}
+      
+      <div class="metrics-actions">
+        <button class="btn-reset btn-delete" onclick="deleteCustomBuffer('${buffer.id}')">
+          🗑️ Eliminar Buffer
+        </button>
+      </div>
+    </div>
+  `;
+  
+  metricsPanel.classList.add('show');
+}
+
+function deleteCustomBuffer(bufferId) {
+  const index = customBuffers.findIndex(b => b.id === bufferId);
+  if (index === -1) return;
+  
+  const buffer = customBuffers[index];
+  
+  // Remover del mapa
+  if (buffer.circle) {
+    layers.buffers.removeLayer(buffer.circle);
+  }
+  
+  // Remover del array
+  customBuffers.splice(index, 1);
+  
+  // Cerrar panel
+  closeMetricsPanel();
+  
+  showNotification("✓ Buffer personalizado eliminado", "success");
+}
+
+window.deleteCustomBuffer = deleteCustomBuffer;
+
+function makeCustomBufferDraggable(circle, buffer) {
+  let isDragging = false;
+  
+  circle.on('mousedown', function(e) {
+    if (!editMode) return;
+    
+    isDragging = true;
+    buffer.isDragging = true;
+    
+    map.dragging.disable();
+    circle.setStyle({ weight: 4, fillOpacity: 0.3 });
+    
+    const onMouseMove = function(e) {
+      if (!isDragging) return;
+      
+      const newLatLng = e.latlng;
+      circle.setLatLng(newLatLng);
+      
+      // Actualizar métricas si el panel está abierto
+      if (metricsPanel && metricsPanel.classList.contains('show')) {
+        updateCustomBufferMetricsLive(buffer, newLatLng);
+      }
+    };
+    
+    const onMouseUp = function(e) {
+      if (!isDragging) return;
+      
+      isDragging = false;
+      buffer.isDragging = false;
+      
+      map.dragging.enable();
+      circle.setStyle({ weight: 2, fillOpacity: 0.15 });
+      
+      map.off('mousemove', onMouseMove);
+      map.off('mouseup', onMouseUp);
+      
+      const finalPos = circle.getLatLng();
+      buffer.currentPos = finalPos;
+      buffer.lat = finalPos.lat;
+      buffer.lng = finalPos.lng;
+      
+      showNotification(`Buffer reposicionado: ${finalPos.lat.toFixed(5)}, ${finalPos.lng.toFixed(5)}`, "success");
+    };
+    
+    map.on('mousemove', onMouseMove);
+    map.on('mouseup', onMouseUp);
+  });
+}
+
+function updateCustomBufferMetricsLive(buffer, position) {
+  if (!metricsPanel || !metricsPanel.classList.contains('show')) return;
+  
+  const metrics = calculateBufferMetrics(position, BUFFER_RADIUS_M);
+  
+  const statsContainer = metricsPanel.querySelector('.metrics-stats');
+  if (statsContainer) {
+    statsContainer.innerHTML = `
+      <div class="metric-item highlight">
+        <div class="metric-icon">🎯</div>
+        <div class="metric-info">
+          <div class="metric-value">${metrics.iesCount}</div>
+          <div class="metric-label">IEs Cubiertas</div>
+        </div>
+      </div>
+      
+      <div class="metric-item">
+        <div class="metric-icon">👥</div>
+        <div class="metric-info">
+          <div class="metric-value">${metrics.totalStudents.toLocaleString()}</div>
+          <div class="metric-label">Estudiantes</div>
+        </div>
+      </div>
+      
+      <div class="metric-item">
+        <div class="metric-icon">👨‍🏫</div>
+        <div class="metric-info">
+          <div class="metric-value">${metrics.profNecesarios}</div>
+          <div class="metric-label">Prof. Necesarios</div>
+        </div>
+      </div>
+      
+      <div class="metric-item">
+        <div class="metric-icon">📏</div>
+        <div class="metric-info">
+          <div class="metric-value">${(BUFFER_RADIUS_M/1000).toFixed(1)} km</div>
+          <div class="metric-label">Radio Buffer</div>
+        </div>
+      </div>
+    `;
+  }
+  
+  const coordsInfo = metricsPanel.querySelector('.coords-info');
+  if (coordsInfo) {
+    coordsInfo.innerHTML = `<span>Posición: ${position.lat.toFixed(5)}, ${position.lng.toFixed(5)}</span>`;
+  }
+  
+  const listContainer = metricsPanel.querySelector('.metrics-list');
+  if (listContainer) {
+    listContainer.innerHTML = metrics.iesList.length > 0 ? `
+      <h4>Instituciones Educativas Cubiertas:</h4>
+      <div class="ie-list">
+        ${metrics.iesList.map(ie => `
+          <div class="ie-item">
+            <div class="ie-name">${escapeHTML(ie.name)}</div>
+            <div class="ie-details">
+              <span class="ie-dist">${(ie.dist/1000).toFixed(2)} km</span>
+              <span class="ie-students">${ie.students} est.</span>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    ` : '<div class="no-ies">⚠️ No hay IEs dentro de este buffer</div>';
   }
 }
 
@@ -132,6 +470,13 @@ function enableBufferEditing() {
         showBufferMetrics(ni, data);
       }
     });
+  });
+  
+  // NUEVO: Hacer arrastrables los buffers personalizados también
+  customBuffers.forEach(buffer => {
+    if (buffer.circle) {
+      makeCustomBufferDraggable(buffer.circle, buffer);
+    }
   });
 }
 
