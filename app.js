@@ -1963,18 +1963,21 @@ function stopAnimations() {
 /****************************************************
  * QA EXTENSION – EXPORTACIÓN DE RESULTADOS
  ****************************************************/
-
 function DECE_exportResults() {
+  // Generar resultados si no existen
+  if (!window.DECE_SPATIAL_RESULTS || !window.DECE_SPATIAL_RESULTS.length) {
+    runSpatialJoinAndCollect();
+  }
+
+  // Volver a validar
   if (!window.DECE_SPATIAL_RESULTS || !window.DECE_SPATIAL_RESULTS.length) {
     alert("No hay resultados para exportar. Verifica buffers y datos.");
     return;
   }
 
   const csv = Papa.unparse(window.DECE_SPATIAL_RESULTS);
-
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
-
   const a = document.createElement("a");
   a.href = url;
   a.download = "DECE_resultados.csv";
