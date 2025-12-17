@@ -36,12 +36,13 @@ const ASSUMED_SPEED_KMH = 30;
 
 // ===== NUEVO: Estado de edición =====
 let editMode = false;
-let addMode = false; // NUEVO: Modo añadir buffers
+let addMode = false;
 let editableBuffers = new Map();
-let customBuffers = []; // NUEVO: Buffers personalizados añadidos
-let customBufferCounter = 0; // NUEVO: Contador para IDs únicos
+let customBuffers = [];
+let customBufferCounter = 0;
 let globalData = null;
 let metricsPanel = null;
+let hasUnsavedChanges = false; // NUEVO: Indicador de cambios sin guardar
 
 // ===== NUEVO: LocalStorage para persistencia =====
 const STORAGE_KEY = 'dece_buffers_state';
@@ -78,9 +79,13 @@ function saveBuffersState() {
   
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    hasUnsavedChanges = false;
+    updateSaveButtonState();
     console.log('✓ Estado guardado:', state);
+    showNotification("💾 Cambios guardados exitosamente", "success");
   } catch (e) {
     console.error('Error al guardar en localStorage:', e);
+    showNotification("❌ Error al guardar cambios", "error");
   }
 }
 
@@ -101,10 +106,30 @@ function loadBuffersState() {
 function clearBuffersState() {
   try {
     localStorage.removeItem(STORAGE_KEY);
+    hasUnsavedChanges = false;
+    updateSaveButtonState();
     console.log('✓ Estado limpiado');
     showNotification("Estado reiniciado. Recarga la página para ver los cambios.", "info");
   } catch (e) {
     console.error('Error al limpiar localStorage:', e);
+  }
+}
+
+function markAsChanged() {
+  hasUnsavedChanges = true;
+  updateSaveButtonState();
+}
+
+function updateSaveButtonState() {
+  const saveBtn = document.getElementById('btnSaveChanges');
+  if (!saveBtn) return;
+  
+  if (hasUnsavedChanges) {
+    saveBtn.classList.add('has-changes');
+    saveBtn.title = 'Hay cambios sin guardar - Click para guardar';
+  } else {
+    saveBtn.classList.remove('has-changes');
+    saveBtn.title = 'Todos los cambios están guardados';
   }
 }
 
@@ -166,6 +191,14 @@ function setupEditControls() {
   const addBtn = document.getElementById("btnAddBuffers");
   if (addBtn) {
     addBtn.addEventListener("click", toggleAddMode);
+  }
+  
+  // NUEVO: Botón guardar cambios
+  const saveBtn = document.getElementById("btnSaveChanges");
+  if (saveBtn) {
+    saveBtn.addEventListener("click", () => {
+      saveBuffersState();
+    });
   }
 }
 
@@ -268,8 +301,8 @@ function createCustomBuffer(lat, lng) {
   // Guardar en array de buffers personalizados
   customBuffers.push(customBuffer);
   
-  // NUEVO: Guardar estado después de crear
-  saveBuffersState();
+  // CAMBIADO: Marcar como cambiado en lugar de guardar
+  markAsChanged();
   
   // Hacer el buffer clickeable para ver métricas
   circle.on('click', (e) => {
@@ -281,8 +314,8 @@ function createCustomBuffer(lat, lng) {
   const metrics = calculateBufferMetrics({ lat, lng }, BUFFER_RADIUS_M);
   
   showNotification(
-    `✓ Buffer creado: ${metrics.iesCount} IEs, ${metrics.totalStudents.toLocaleString()} estudiantes`,
-    "success"
+    `✓ Buffer creado: ${metrics.iesCount} IEs. Click en "Guardar Cambios" para mantener.`,
+    "info"
   );
   
   // Hacer arrastrable si está en modo edición
@@ -394,13 +427,13 @@ function deleteCustomBuffer(bufferId) {
   // Remover del array
   customBuffers.splice(index, 1);
   
-  // NUEVO: Guardar estado después de eliminar
-  saveBuffersState();
+  // CAMBIADO: Marcar como cambiado en lugar de guardar
+  markAsChanged();
   
   // Cerrar panel
   closeMetricsPanel();
   
-  showNotification("✓ Buffer personalizado eliminado", "success");
+  showNotification("✓ Buffer eliminado. Click en 'Guardar Cambios' para confirmar.", "info");
 }
 
 window.deleteCustomBuffer = deleteCustomBuffer;
@@ -446,10 +479,10 @@ function makeCustomBufferDraggable(circle, buffer) {
       buffer.lat = finalPos.lat;
       buffer.lng = finalPos.lng;
       
-      // NUEVO: Guardar estado después de mover
-      saveBuffersState();
+      // CAMBIADO: Marcar como cambiado en lugar de guardar
+      markAsChanged();
       
-      showNotification(`Buffer reposicionado: ${finalPos.lat.toFixed(5)}, ${finalPos.lng.toFixed(5)}`, "success");
+      showNotification(`Buffer reposicionado. Click en "Guardar Cambios" para mantener.`, "info");
     };
     
     map.on('mousemove', onMouseMove);
@@ -610,10 +643,10 @@ function makeBufferDraggable(circle, ni, data) {
       const finalPos = circle.getLatLng();
       data.currentPos = finalPos;
       
-      // NUEVO: Guardar estado después de mover
-      saveBuffersState();
+      // CAMBIADO: Marcar como cambiado en lugar de guardar
+      markAsChanged();
       
-      showNotification(`Buffer reposicionado: ${finalPos.lat.toFixed(5)}, ${finalPos.lng.toFixed(5)}`, "success");
+      showNotification(`Buffer reposicionado. Click en "Guardar Cambios" para mantener.`, "info");
       
       updateBufferMetricsLive(ni, finalPos);
     };
@@ -832,10 +865,10 @@ function resetBufferPosition(ni) {
   data.circle.setLatLng([originalPos.lat, originalPos.lng]);
   data.currentPos = originalPos;
   
-  // NUEVO: Guardar estado después de restaurar
-  saveBuffersState();
+  // CAMBIADO: Marcar como cambiado en lugar de guardar
+  markAsChanged();
   
-  showNotification("✓ Posición restaurada al núcleo original", "success");
+  showNotification("✓ Posición restaurada. Click en 'Guardar Cambios' para confirmar.", "info");
   updateBufferMetricsLive(ni, originalPos);
 }
 
