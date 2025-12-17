@@ -3,7 +3,7 @@
  * ✅ Buffers visibles y ARRASTRABLES
  * ✅ Modo edición con botón lápiz
  * ✅ Métricas en tiempo real al arrastrar/click
- * ✅ Sin afectar lógica original
+ * ✅ Exportación corregida y funcional
  *************************************************/
 
 let map;
@@ -34,7 +34,7 @@ const ENABLE_NUCLEO_PULSE = false;
 const MAX_CONNECTIONS_FOR_ANIM = 6000;
 const ASSUMED_SPEED_KMH = 30;
 
-// ===== NUEVO: Estado de edición =====
+// ===== Estado de edición =====
 let editMode = false;
 let addMode = false;
 let editableBuffers = new Map();
@@ -42,9 +42,9 @@ let customBuffers = [];
 let customBufferCounter = 0;
 let globalData = null;
 let metricsPanel = null;
-let hasUnsavedChanges = false; // NUEVO: Indicador de cambios sin guardar
+let hasUnsavedChanges = false;
 
-// ===== NUEVO: LocalStorage para persistencia =====
+// ===== LocalStorage para persistencia =====
 const STORAGE_KEY = 'dece_buffers_state';
 
 function saveBuffersState() {
@@ -54,7 +54,6 @@ function saveBuffersState() {
     timestamp: new Date().toISOString()
   };
   
-  // Guardar buffers editables (originales movidos)
   editableBuffers.forEach((data, ni) => {
     const currentPos = data.circle.getLatLng();
     state.editableBuffers.push({
@@ -66,7 +65,6 @@ function saveBuffersState() {
     });
   });
   
-  // Guardar buffers personalizados
   customBuffers.forEach(buffer => {
     const currentPos = buffer.circle.getLatLng();
     state.customBuffers.push({
@@ -81,7 +79,6 @@ function saveBuffersState() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     hasUnsavedChanges = false;
     updateSaveButtonState();
-    console.log('✓ Estado guardado:', state);
     showNotification("💾 Cambios guardados exitosamente", "success");
   } catch (e) {
     console.error('Error al guardar en localStorage:', e);
@@ -93,10 +90,7 @@ function loadBuffersState() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) return null;
-    
-    const state = JSON.parse(saved);
-    console.log('✓ Estado cargado:', state);
-    return state;
+    return JSON.parse(saved);
   } catch (e) {
     console.error('Error al cargar desde localStorage:', e);
     return null;
@@ -108,7 +102,6 @@ function clearBuffersState() {
     localStorage.removeItem(STORAGE_KEY);
     hasUnsavedChanges = false;
     updateSaveButtonState();
-    console.log('✓ Estado limpiado');
     showNotification("Estado reiniciado. Recarga la página para ver los cambios.", "info");
   } catch (e) {
     console.error('Error al limpiar localStorage:', e);
@@ -123,7 +116,6 @@ function markAsChanged() {
 function updateSaveButtonState() {
   const saveBtn = document.getElementById('btnSaveChanges');
   if (!saveBtn) return;
-  
   if (hasUnsavedChanges) {
     saveBtn.classList.add('has-changes');
     saveBtn.title = 'Hay cambios sin guardar - Click para guardar';
@@ -150,7 +142,6 @@ function completeCoverage() {
   
   showNotification("🔄 Analizando territorio y completando cobertura...", "info");
   
-  // Encontrar satélites sin cobertura
   const uncoveredSatellites = findUncoveredSatellites();
   
   if (uncoveredSatellites.length === 0) {
@@ -158,19 +149,12 @@ function completeCoverage() {
     return;
   }
   
-  console.log(`📍 Encontrados ${uncoveredSatellites.length} satélites sin cobertura`);
-  
-  // Crear buffers para cubrir satélites sin cobertura usando algoritmo de clustering
   const newBuffers = createOptimalBuffers(uncoveredSatellites);
   
-  console.log(`📍 Creando ${newBuffers.length} buffers adicionales`);
-  
-  // Crear los buffers en el mapa
   newBuffers.forEach(bufferPos => {
     createCustomBuffer(bufferPos.lat, bufferPos.lng);
   });
   
-  // Verificar cobertura final
   setTimeout(() => {
     const stillUncovered = findUncoveredSatellites();
     const totalSats = satellites.length;
@@ -184,7 +168,6 @@ function completeCoverage() {
       stillUncovered.length === 0 ? "success" : "info"
     );
     
-    // Marcar como cambiado para que el usuario guarde
     markAsChanged();
   }, 500);
 }
@@ -198,7 +181,6 @@ function findUncoveredSatellites() {
   satellites.forEach((sat, index) => {
     let isCovered = false;
     
-    // Verificar si está cubierto por buffers editables (originales)
     editableBuffers.forEach(data => {
       const bufferPos = data.circle.getLatLng();
       const dist = haversineMeters(sat.lat, sat.lng, bufferPos.lat, bufferPos.lng);
@@ -207,7 +189,6 @@ function findUncoveredSatellites() {
       }
     });
     
-    // Verificar si está cubierto por buffers personalizados
     if (!isCovered) {
       customBuffers.forEach(buffer => {
         const bufferPos = buffer.circle.getLatLng();
@@ -227,15 +208,11 @@ function findUncoveredSatellites() {
 }
 
 function createOptimalBuffers(uncoveredSatellites) {
-  // Usar K-means clustering para encontrar posiciones óptimas de buffers
   const maxIterations = 10;
-  const minDistance = BUFFER_RADIUS_M * 1.5; // Evitar buffers muy cerca uno del otro
-  
-  // Estimar número de buffers necesarios
-  const estimatedBuffers = Math.ceil(uncoveredSatellites.length / 5); // ~5 satélites por buffer
+  const minDistance = BUFFER_RADIUS_M * 1.5;
+  const estimatedBuffers = Math.ceil(uncoveredSatellites.length / 5);
   let numClusters = Math.min(estimatedBuffers, uncoveredSatellites.length);
   
-  // Inicializar centroides aleatoriamente
   let centroids = [];
   const usedIndices = new Set();
   
@@ -250,9 +227,7 @@ function createOptimalBuffers(uncoveredSatellites) {
     centroids.push({ lat: sat.lat, lng: sat.lng });
   }
   
-  // K-means: Iterar para refinar posiciones
   for (let iter = 0; iter < maxIterations; iter++) {
-    // Asignar cada satélite al centroide más cercano
     const clusters = Array.from({ length: numClusters }, () => []);
     
     uncoveredSatellites.forEach(sat => {
@@ -270,51 +245,34 @@ function createOptimalBuffers(uncoveredSatellites) {
       clusters[closestCluster].push(sat);
     });
     
-    // Recalcular centroides
     const newCentroids = [];
     clusters.forEach(cluster => {
       if (cluster.length === 0) return;
-      
       const avgLat = cluster.reduce((sum, s) => sum + s.lat, 0) / cluster.length;
       const avgLng = cluster.reduce((sum, s) => sum + s.lng, 0) / cluster.length;
-      
       newCentroids.push({ lat: avgLat, lng: avgLng });
     });
     
     centroids = newCentroids;
   }
   
-  // Filtrar centroides que están muy cerca de buffers existentes
-  const finalBuffers = centroids.filter(centroid => {
+  return centroids.filter(centroid => {
     let tooClose = false;
-    
-    // Verificar distancia a buffers editables
     editableBuffers.forEach(data => {
       const bufferPos = data.circle.getLatLng();
       const dist = haversineMeters(centroid.lat, centroid.lng, bufferPos.lat, bufferPos.lng);
-      if (dist < minDistance) {
-        tooClose = true;
-      }
+      if (dist < minDistance) tooClose = true;
     });
-    
-    // Verificar distancia a buffers personalizados
-    if (!tooClose) {
-      customBuffers.forEach(buffer => {
-        const bufferPos = buffer.circle.getLatLng();
-        const dist = haversineMeters(centroid.lat, centroid.lng, bufferPos.lat, bufferPos.lng);
-        if (dist < minDistance) {
-          tooClose = true;
-        }
-      });
-    }
-    
+    customBuffers.forEach(buffer => {
+      const bufferPos = buffer.circle.getLatLng();
+      const dist = haversineMeters(centroid.lat, centroid.lng, bufferPos.lat, bufferPos.lng);
+      if (dist < minDistance) tooClose = true;
+    });
     return !tooClose;
   });
-  
-  return finalBuffers;
 }
 
-// NUEVO: Función para mostrar panel con instituciones sin cobertura
+// Función para mostrar panel con instituciones sin cobertura
 function showUncoveredInstitutions() {
   const uncovered = findUncoveredSatellites();
   
@@ -323,7 +281,6 @@ function showUncoveredInstitutions() {
     return;
   }
   
-  // Crear panel modal
   const modal = document.createElement('div');
   modal.className = 'uncovered-modal';
   modal.innerHTML = `
@@ -377,8 +334,6 @@ function showUncoveredInstitutions() {
   `;
   
   document.body.appendChild(modal);
-  
-  // Animar entrada
   setTimeout(() => modal.classList.add('show'), 10);
 }
 
@@ -393,7 +348,6 @@ let _pulsePhase = 0;
 document.addEventListener("DOMContentLoaded", () => {
   if (_initialized) return;
   _initialized = true;
-
   initMap();
   setupControls();
   setupEditControls();
@@ -420,54 +374,29 @@ function initMap() {
   );
 
   osmLayer.addTo(map);
-
-  L.control.layers({
-    "OpenStreetMap": osmLayer,
-    "Satélite": satelliteLayer
-  }).addTo(map);
-
+  L.control.layers({ "OpenStreetMap": osmLayer, "Satélite": satelliteLayer }).addTo(map);
   Object.values(layers).forEach(layer => layer.addTo(map));
 }
 
 function setupEditControls() {
   const editBtn = document.getElementById("btnEditBuffers");
-  if (!editBtn) {
-    console.warn("Botón de edición no encontrado");
-    return;
-  }
-
+  if (!editBtn) return;
   editBtn.addEventListener("click", toggleEditMode);
   
-  // NUEVO: Botón añadir buffers
   const addBtn = document.getElementById("btnAddBuffers");
-  if (addBtn) {
-    addBtn.addEventListener("click", toggleAddMode);
-  }
+  if (addBtn) addBtn.addEventListener("click", toggleAddMode);
   
-  // NUEVO: Botón guardar cambios
   const saveBtn = document.getElementById("btnSaveChanges");
-  if (saveBtn) {
-    saveBtn.addEventListener("click", () => {
-      saveBuffersState();
-    });
-  }
+  if (saveBtn) saveBtn.addEventListener("click", saveBuffersState);
   
-  // NUEVO: Botón completar cobertura
   const completeBtn = document.getElementById("btnCompleteCoverage");
-  if (completeBtn) {
-    completeBtn.addEventListener("click", completeCoverage);
-  }
+  if (completeBtn) completeBtn.addEventListener("click", completeCoverage);
 }
 
 function toggleEditMode() {
   editMode = !editMode;
   const btn = document.getElementById("btnEditBuffers");
-  
-  // Desactivar modo añadir si está activo
-  if (editMode && addMode) {
-    toggleAddMode();
-  }
-  
+  if (editMode && addMode) toggleAddMode();
   if (editMode) {
     btn.classList.add("active");
     enableBufferEditing();
@@ -480,16 +409,10 @@ function toggleEditMode() {
   }
 }
 
-// NUEVO: Función para modo añadir buffers
 function toggleAddMode() {
   addMode = !addMode;
   const btn = document.getElementById("btnAddBuffers");
-  
-  // Desactivar modo edición si está activo
-  if (addMode && editMode) {
-    toggleEditMode();
-  }
-  
+  if (addMode && editMode) toggleEditMode();
   if (addMode) {
     btn.classList.add("active");
     enableAddBufferMode();
@@ -503,25 +426,18 @@ function toggleAddMode() {
 
 function enableAddBufferMode() {
   map.getContainer().style.cursor = 'crosshair';
-  
-  // Añadir evento click al mapa
   map.on('click', onMapClickAddBuffer);
 }
 
 function disableAddBufferMode() {
   map.getContainer().style.cursor = '';
-  
-  // Remover evento click del mapa
   map.off('click', onMapClickAddBuffer);
 }
 
 function onMapClickAddBuffer(e) {
   if (!addMode) return;
-  
   const lat = e.latlng.lat;
   const lng = e.latlng.lng;
-  
-  // Crear nuevo buffer personalizado
   createCustomBuffer(lat, lng);
 }
 
@@ -529,10 +445,9 @@ function createCustomBuffer(lat, lng) {
   customBufferCounter++;
   const bufferId = `custom_${customBufferCounter}`;
   
-  // Crear círculo en el mapa
   const circle = L.circle([lat, lng], {
     radius: BUFFER_RADIUS_M,
-    color: '#a371f7', // Color púrpura para buffers personalizados
+    color: '#a371f7',
     fillColor: '#a371f7',
     weight: 2,
     opacity: 0.7,
@@ -542,7 +457,6 @@ function createCustomBuffer(lat, lng) {
   
   circle.addTo(layers.buffers);
   
-  // Crear objeto buffer personalizado
   const customBuffer = {
     id: bufferId,
     circle: circle,
@@ -555,30 +469,18 @@ function createCustomBuffer(lat, lng) {
     name: `Buffer Personalizado #${customBufferCounter}`
   };
   
-  // Guardar en array de buffers personalizados
   customBuffers.push(customBuffer);
-  
-  // CAMBIADO: Marcar como cambiado en lugar de guardar
   markAsChanged();
   
-  // Hacer el buffer clickeable para ver métricas
   circle.on('click', (e) => {
     L.DomEvent.stopPropagation(e);
     showCustomBufferMetrics(customBuffer);
   });
   
-  // Calcular métricas iniciales
   const metrics = calculateBufferMetrics({ lat, lng }, BUFFER_RADIUS_M);
+  showNotification(`✓ Buffer creado: ${metrics.iesCount} IEs. Click en "Guardar Cambios" para mantener.`, "info");
   
-  showNotification(
-    `✓ Buffer creado: ${metrics.iesCount} IEs. Click en "Guardar Cambios" para mantener.`,
-    "info"
-  );
-  
-  // Hacer arrastrable si está en modo edición
-  if (editMode) {
-    makeCustomBufferDraggable(circle, customBuffer);
-  }
+  if (editMode) makeCustomBufferDraggable(circle, customBuffer);
 }
 
 function showCustomBufferMetrics(buffer) {
@@ -675,21 +577,10 @@ function deleteCustomBuffer(bufferId) {
   if (index === -1) return;
   
   const buffer = customBuffers[index];
-  
-  // Remover del mapa
-  if (buffer.circle) {
-    layers.buffers.removeLayer(buffer.circle);
-  }
-  
-  // Remover del array
+  if (buffer.circle) layers.buffers.removeLayer(buffer.circle);
   customBuffers.splice(index, 1);
-  
-  // CAMBIADO: Marcar como cambiado en lugar de guardar
   markAsChanged();
-  
-  // Cerrar panel
   closeMetricsPanel();
-  
   showNotification("✓ Buffer eliminado. Click en 'Guardar Cambios' para confirmar.", "info");
 }
 
@@ -713,7 +604,6 @@ function makeCustomBufferDraggable(circle, buffer) {
       const newLatLng = e.latlng;
       circle.setLatLng(newLatLng);
       
-      // Actualizar métricas si el panel está abierto
       if (metricsPanel && metricsPanel.classList.contains('show')) {
         updateCustomBufferMetricsLive(buffer, newLatLng);
       }
@@ -736,9 +626,7 @@ function makeCustomBufferDraggable(circle, buffer) {
       buffer.lat = finalPos.lat;
       buffer.lng = finalPos.lng;
       
-      // CAMBIADO: Marcar como cambiado en lugar de guardar
       markAsChanged();
-      
       showNotification(`Buffer reposicionado. Click en "Guardar Cambios" para mantener.`, "info");
     };
     
@@ -836,7 +724,6 @@ function enableBufferEditing() {
     });
   });
   
-  // NUEVO: Hacer arrastrables los buffers personalizados también
   customBuffers.forEach(buffer => {
     if (buffer.circle) {
       makeCustomBufferDraggable(buffer.circle, buffer);
@@ -900,9 +787,7 @@ function makeBufferDraggable(circle, ni, data) {
       const finalPos = circle.getLatLng();
       data.currentPos = finalPos;
       
-      // CAMBIADO: Marcar como cambiado en lugar de guardar
       markAsChanged();
-      
       showNotification(`Buffer reposicionado. Click en "Guardar Cambios" para mantener.`, "info");
       
       updateBufferMetricsLive(ni, finalPos);
@@ -1028,7 +913,8 @@ function updateBufferMetricsLive(ni, position) {
       </div>
       
       <div class="metric-item">
-        <div class="metric-icon">👨‍🏫</div>
+        <div class="metric-icon">👨‍
+                <div class="metric-icon">👨‍🏫</div>
         <div class="metric-info">
           <div class="metric-value">${metrics.profNecesarios}</div>
           <div class="metric-label">Prof. Necesarios</div>
@@ -1095,21 +981,13 @@ function calculateBufferMetrics(position, radius) {
   });
   
   iesList.sort((a, b) => a.dist - b.dist);
-  
   const profNecesarios = Math.ceil(totalStudents / 450);
   
-  return {
-    iesCount,
-    totalStudents,
-    profNecesarios,
-    iesList
-  };
+  return { iesCount, totalStudents, profNecesarios, iesList };
 }
 
 function closeMetricsPanel() {
-  if (metricsPanel) {
-    metricsPanel.classList.remove('show');
-  }
+  if (metricsPanel) metricsPanel.classList.remove('show');
 }
 
 window.closeMetricsPanel = closeMetricsPanel;
@@ -1122,9 +1000,7 @@ function resetBufferPosition(ni) {
   data.circle.setLatLng([originalPos.lat, originalPos.lng]);
   data.currentPos = originalPos;
   
-  // CAMBIADO: Marcar como cambiado en lugar de guardar
   markAsChanged();
-  
   showNotification("✓ Posición restaurada. Click en 'Guardar Cambios' para confirmar.", "info");
   updateBufferMetricsLive(ni, originalPos);
 }
@@ -1546,7 +1422,6 @@ function drawNucleos(nucleos, selected) {
 }
 
 function drawBuffersEditable(nucleos, selected, nucleoStats) {
-  // NUEVO: Cargar estado guardado
   const savedState = loadBuffersState();
   const savedPositions = new Map();
   
@@ -1560,7 +1435,6 @@ function drawBuffersEditable(nucleos, selected, nucleoStats) {
     const n = nucleos[ni];
     const st = nucleoStats[ni];
     
-    // NUEVO: Usar posición guardada si existe
     const savedPos = savedPositions.get(ni);
     const lat = savedPos ? savedPos.lat : n.lat;
     const lng = savedPos ? savedPos.lng : n.lng;
@@ -1587,7 +1461,6 @@ function drawBuffersEditable(nucleos, selected, nucleoStats) {
     });
   });
   
-  // NUEVO: Restaurar buffers personalizados
   if (savedState && savedState.customBuffers) {
     savedState.customBuffers.forEach(saved => {
       restoreCustomBuffer(saved);
@@ -1595,7 +1468,6 @@ function drawBuffersEditable(nucleos, selected, nucleoStats) {
   }
 }
 
-// NUEVO: Función para restaurar buffer personalizado desde localStorage
 function restoreCustomBuffer(saved) {
   customBufferCounter++;
   
@@ -1659,6 +1531,7 @@ function drawSatellites(satellites, satCandidates, selected) {
     });
 
     marker.bindPopup(createSatellitePopup(s, isCovered ? bestDist : null));
+    marker._data = s; // ← ESTA LÍNEA ES CLAVE PARA EXPORTAR
     marker.addTo(layers.satellites);
   });
 }
@@ -1745,7 +1618,8 @@ function createSatellitePopup(s, distMetersOrNull) {
       '<div class="popup-row"><span class="popup-label">Estado:</span> <span class="popup-value" style="color:' + (covered ? "#3fb950" : "#f85149") + '">' + (covered ? "✓ Cubierto" : "✗ Sin cobertura") + '</span></div>' +
       (covered
         ? '<div class="popup-row"><span class="popup-label">Distancia:</span> <span class="popup-value">' + km + ' km</span></div>' +
-          '<div class="popup-row"><span class="popup-label">Tiempo est.:</span> <span class="popup-value">' + min + ' min</span></div>'
+          '<div class="
+                 <div class="popup-row"><span class="popup-label">Tiempo est.:</span> <span class="popup-value">' + min + ' min</span></div>'
         : ''
       ) +
       '<div class="popup-row"><span class="popup-label">Estudiantes:</span> <span class="popup-value" style="color:#d29922">' + Number(s.students || 0).toLocaleString() + '</span></div>' +
@@ -1961,6 +1835,104 @@ function stopAnimations() {
 }
 
 /****************************************************
+ * QA EXTENSION – SPATIAL JOIN + EXPORTACIÓN
+ ****************************************************/
+
+// Almacén de resultados por buffer
+window.DECE_SPATIAL_RESULTS = [];
+
+// Ejecuta spatial join usando buffers ya dibujados
+function runSpatialJoinAndCollect() {
+  const results = [];
+
+  if (!layers || !layers.buffers || !layers.satellites) {
+    console.warn("Capas no disponibles para spatial join");
+    window.DECE_SPATIAL_RESULTS = [];
+    return [];
+  }
+
+  // Recorrer todos los buffers (editables + personalizados)
+  const allBuffers = [];
+
+  // Buffers editables (originales)
+  editableBuffers.forEach((data, ni) => {
+    const pos = data.circle.getLatLng();
+    allBuffers.push({
+      id: `nucleo_${ni}`,
+      name: data.nucleo.name,
+      lat: pos.lat,
+      lng: pos.lng,
+      circle: data.circle
+    });
+  });
+
+  // Buffers personalizados
+  customBuffers.forEach(buffer => {
+    const pos = buffer.circle.getLatLng();
+    allBuffers.push({
+      id: buffer.id,
+      name: buffer.name,
+      lat: pos.lat,
+      lng: pos.lng,
+      circle: buffer.circle
+    });
+  });
+
+  allBuffers.forEach(buffer => {
+    const inside = [];
+
+    layers.satellites.eachLayer(sat => {
+      const satPos = sat.getLatLng();
+      const dist = haversineMeters(buffer.lat, buffer.lng, satPos.lat, satPos.lng);
+      if (dist <= BUFFER_RADIUS_M) {
+        inside.push({
+          amie: sat._data?.amie || '',
+          name: sat._data?.name || 'Sin nombre',
+          students: sat._data?.students || 0
+        });
+      }
+    });
+
+    results.push({
+      buffer_id: buffer.id,
+      buffer_name: buffer.name,
+      buffer_lat: buffer.lat,
+      buffer_lng: buffer.lng,
+      total_satellites: inside.length,
+      amies_satellite: inside.map(s => s.amie).join("|"),
+      estudiantes: inside.reduce((sum, s) => sum + s.students, 0)
+    });
+  });
+
+  window.DECE_SPATIAL_RESULTS = results;
+  return results;
+}
+
+// Exportar resultados
+function exportSpatialResults(format = "csv") {
+  const data = runSpatialJoinAndCollect();
+  if (!data.length) {
+    alert("No hay resultados para exportar");
+    return;
+  }
+
+  if (format === "csv") {
+    downloadFile(Papa.unparse(data), "DECE_resultados.csv");
+  } else if (format === "json") {
+    downloadFile(JSON.stringify(data, null, 2), "DECE_resultados.json");
+  }
+}
+
+// Utilidad descarga
+function downloadFile(content, filename) {
+  const blob = new Blob([content], { type: "text/plain" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+}
+
+/****************************************************
  * QA EXTENSION – EXPORTACIÓN DE RESULTADOS
  ****************************************************/
 function DECE_exportResults() {
@@ -2008,3 +1980,4 @@ document.addEventListener("DOMContentLoaded", () => {
     DECE_exportResults();
   });
 });
+        
