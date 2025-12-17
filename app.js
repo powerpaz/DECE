@@ -133,6 +133,257 @@ function updateSaveButtonState() {
   }
 }
 
+/* =========================
+   COMPLETAR COBERTURA
+========================= */
+function completeCoverage() {
+  if (!globalData) {
+    showNotification("❌ Espera a que carguen los datos primero", "error");
+    return;
+  }
+  
+  const satellites = globalData.satellites;
+  if (!satellites || satellites.length === 0) {
+    showNotification("❌ No hay satélites para cubrir", "error");
+    return;
+  }
+  
+  showNotification("🔄 Analizando territorio y completando cobertura...", "info");
+  
+  // Encontrar satélites sin cobertura
+  const uncoveredSatellites = findUncoveredSatellites();
+  
+  if (uncoveredSatellites.length === 0) {
+    showNotification("✅ ¡Cobertura completa! Todos los satélites están cubiertos.", "success");
+    return;
+  }
+  
+  console.log(`📍 Encontrados ${uncoveredSatellites.length} satélites sin cobertura`);
+  
+  // Crear buffers para cubrir satélites sin cobertura usando algoritmo de clustering
+  const newBuffers = createOptimalBuffers(uncoveredSatellites);
+  
+  console.log(`📍 Creando ${newBuffers.length} buffers adicionales`);
+  
+  // Crear los buffers en el mapa
+  newBuffers.forEach(bufferPos => {
+    createCustomBuffer(bufferPos.lat, bufferPos.lng);
+  });
+  
+  // Verificar cobertura final
+  setTimeout(() => {
+    const stillUncovered = findUncoveredSatellites();
+    const totalSats = satellites.length;
+    const covered = totalSats - stillUncovered.length;
+    const coveragePercent = ((covered / totalSats) * 100).toFixed(1);
+    
+    showNotification(
+      `✅ Cobertura completada: ${covered}/${totalSats} satélites (${coveragePercent}%). ` +
+      `${newBuffers.length} buffers agregados. ` +
+      (stillUncovered.length > 0 ? `⚠️ ${stillUncovered.length} quedan sin cubrir.` : ''),
+      stillUncovered.length === 0 ? "success" : "info"
+    );
+    
+    // Marcar como cambiado para que el usuario guarde
+    markAsChanged();
+  }, 500);
+}
+
+function findUncoveredSatellites() {
+  if (!globalData) return [];
+  
+  const satellites = globalData.satellites;
+  const uncovered = [];
+  
+  satellites.forEach((sat, index) => {
+    let isCovered = false;
+    
+    // Verificar si está cubierto por buffers editables (originales)
+    editableBuffers.forEach(data => {
+      const bufferPos = data.circle.getLatLng();
+      const dist = haversineMeters(sat.lat, sat.lng, bufferPos.lat, bufferPos.lng);
+      if (dist <= BUFFER_RADIUS_M) {
+        isCovered = true;
+      }
+    });
+    
+    // Verificar si está cubierto por buffers personalizados
+    if (!isCovered) {
+      customBuffers.forEach(buffer => {
+        const bufferPos = buffer.circle.getLatLng();
+        const dist = haversineMeters(sat.lat, sat.lng, bufferPos.lat, bufferPos.lng);
+        if (dist <= BUFFER_RADIUS_M) {
+          isCovered = true;
+        }
+      });
+    }
+    
+    if (!isCovered) {
+      uncovered.push({ ...sat, index });
+    }
+  });
+  
+  return uncovered;
+}
+
+function createOptimalBuffers(uncoveredSatellites) {
+  // Usar K-means clustering para encontrar posiciones óptimas de buffers
+  const maxIterations = 10;
+  const minDistance = BUFFER_RADIUS_M * 1.5; // Evitar buffers muy cerca uno del otro
+  
+  // Estimar número de buffers necesarios
+  const estimatedBuffers = Math.ceil(uncoveredSatellites.length / 5); // ~5 satélites por buffer
+  let numClusters = Math.min(estimatedBuffers, uncoveredSatellites.length);
+  
+  // Inicializar centroides aleatoriamente
+  let centroids = [];
+  const usedIndices = new Set();
+  
+  for (let i = 0; i < numClusters; i++) {
+    let randomIndex;
+    do {
+      randomIndex = Math.floor(Math.random() * uncoveredSatellites.length);
+    } while (usedIndices.has(randomIndex));
+    
+    usedIndices.add(randomIndex);
+    const sat = uncoveredSatellites[randomIndex];
+    centroids.push({ lat: sat.lat, lng: sat.lng });
+  }
+  
+  // K-means: Iterar para refinar posiciones
+  for (let iter = 0; iter < maxIterations; iter++) {
+    // Asignar cada satélite al centroide más cercano
+    const clusters = Array.from({ length: numClusters }, () => []);
+    
+    uncoveredSatellites.forEach(sat => {
+      let minDist = Infinity;
+      let closestCluster = 0;
+      
+      centroids.forEach((centroid, ci) => {
+        const dist = haversineMeters(sat.lat, sat.lng, centroid.lat, centroid.lng);
+        if (dist < minDist) {
+          minDist = dist;
+          closestCluster = ci;
+        }
+      });
+      
+      clusters[closestCluster].push(sat);
+    });
+    
+    // Recalcular centroides
+    const newCentroids = [];
+    clusters.forEach(cluster => {
+      if (cluster.length === 0) return;
+      
+      const avgLat = cluster.reduce((sum, s) => sum + s.lat, 0) / cluster.length;
+      const avgLng = cluster.reduce((sum, s) => sum + s.lng, 0) / cluster.length;
+      
+      newCentroids.push({ lat: avgLat, lng: avgLng });
+    });
+    
+    centroids = newCentroids;
+  }
+  
+  // Filtrar centroides que están muy cerca de buffers existentes
+  const finalBuffers = centroids.filter(centroid => {
+    let tooClose = false;
+    
+    // Verificar distancia a buffers editables
+    editableBuffers.forEach(data => {
+      const bufferPos = data.circle.getLatLng();
+      const dist = haversineMeters(centroid.lat, centroid.lng, bufferPos.lat, bufferPos.lng);
+      if (dist < minDistance) {
+        tooClose = true;
+      }
+    });
+    
+    // Verificar distancia a buffers personalizados
+    if (!tooClose) {
+      customBuffers.forEach(buffer => {
+        const bufferPos = buffer.circle.getLatLng();
+        const dist = haversineMeters(centroid.lat, centroid.lng, bufferPos.lat, bufferPos.lng);
+        if (dist < minDistance) {
+          tooClose = true;
+        }
+      });
+    }
+    
+    return !tooClose;
+  });
+  
+  return finalBuffers;
+}
+
+// NUEVO: Función para mostrar panel con instituciones sin cobertura
+function showUncoveredInstitutions() {
+  const uncovered = findUncoveredSatellites();
+  
+  if (uncovered.length === 0) {
+    showNotification("✅ ¡Todas las instituciones están cubiertas!", "success");
+    return;
+  }
+  
+  // Crear panel modal
+  const modal = document.createElement('div');
+  modal.className = 'uncovered-modal';
+  modal.innerHTML = `
+    <div class="uncovered-panel">
+      <div class="uncovered-header">
+        <h3>⚠️ Instituciones Sin Cobertura</h3>
+        <button class="close-btn" onclick="this.closest('.uncovered-modal').remove()">×</button>
+      </div>
+      <div class="uncovered-content">
+        <div class="uncovered-summary">
+          <div class="summary-item">
+            <span class="summary-number">${uncovered.length}</span>
+            <span class="summary-label">Instituciones sin cubrir</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-number">${uncovered.reduce((sum, s) => sum + (s.students || 0), 0).toLocaleString()}</span>
+            <span class="summary-label">Estudiantes afectados</span>
+          </div>
+        </div>
+        
+        <div class="uncovered-actions">
+          <button class="btn-action-modal" onclick="completeCoverage(); this.closest('.uncovered-modal').remove();">
+            🔧 Completar Cobertura Automática
+          </button>
+        </div>
+        
+        <div class="uncovered-list-header">
+          <h4>Lista de Instituciones:</h4>
+        </div>
+        <div class="uncovered-list">
+          ${uncovered.map((sat, idx) => `
+            <div class="uncovered-item" onclick="map.flyTo([${sat.lat}, ${sat.lng}], 13)">
+              <div class="uncovered-item-number">${idx + 1}</div>
+              <div class="uncovered-item-info">
+                <div class="uncovered-item-name">${escapeHTML(sat.name)}</div>
+                <div class="uncovered-item-details">
+                  <span>📍 ${sat.lat.toFixed(5)}, ${sat.lng.toFixed(5)}</span>
+                  <span>👥 ${sat.students || 0} estudiantes</span>
+                </div>
+              </div>
+              <div class="uncovered-item-action">
+                <button onclick="event.stopPropagation(); createCustomBuffer(${sat.lat}, ${sat.lng}); this.closest('.uncovered-modal').remove();" title="Crear buffer aquí">
+                  ➕
+                </button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  
+  // Animar entrada
+  setTimeout(() => modal.classList.add('show'), 10);
+}
+
+window.showUncoveredInstitutions = showUncoveredInstitutions;
+
 // Estado interno
 let _initialized = false;
 let _connectionAnimTimer = null;
@@ -199,6 +450,12 @@ function setupEditControls() {
     saveBtn.addEventListener("click", () => {
       saveBuffersState();
     });
+  }
+  
+  // NUEVO: Botón completar cobertura
+  const completeBtn = document.getElementById("btnCompleteCoverage");
+  if (completeBtn) {
+    completeBtn.addEventListener("click", completeCoverage);
   }
 }
 
