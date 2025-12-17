@@ -43,6 +43,71 @@ let customBufferCounter = 0; // NUEVO: Contador para IDs únicos
 let globalData = null;
 let metricsPanel = null;
 
+// ===== NUEVO: LocalStorage para persistencia =====
+const STORAGE_KEY = 'dece_buffers_state';
+
+function saveBuffersState() {
+  const state = {
+    editableBuffers: [],
+    customBuffers: [],
+    timestamp: new Date().toISOString()
+  };
+  
+  // Guardar buffers editables (originales movidos)
+  editableBuffers.forEach((data, ni) => {
+    const currentPos = data.circle.getLatLng();
+    state.editableBuffers.push({
+      ni: ni,
+      currentLat: currentPos.lat,
+      currentLng: currentPos.lng,
+      originalLat: data.originalPos.lat,
+      originalLng: data.originalPos.lng
+    });
+  });
+  
+  // Guardar buffers personalizados
+  customBuffers.forEach(buffer => {
+    const currentPos = buffer.circle.getLatLng();
+    state.customBuffers.push({
+      id: buffer.id,
+      lat: currentPos.lat,
+      lng: currentPos.lng,
+      name: buffer.name
+    });
+  });
+  
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    console.log('✓ Estado guardado:', state);
+  } catch (e) {
+    console.error('Error al guardar en localStorage:', e);
+  }
+}
+
+function loadBuffersState() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return null;
+    
+    const state = JSON.parse(saved);
+    console.log('✓ Estado cargado:', state);
+    return state;
+  } catch (e) {
+    console.error('Error al cargar desde localStorage:', e);
+    return null;
+  }
+}
+
+function clearBuffersState() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    console.log('✓ Estado limpiado');
+    showNotification("Estado reiniciado. Recarga la página para ver los cambios.", "info");
+  } catch (e) {
+    console.error('Error al limpiar localStorage:', e);
+  }
+}
+
 // Estado interno
 let _initialized = false;
 let _connectionAnimTimer = null;
@@ -203,6 +268,9 @@ function createCustomBuffer(lat, lng) {
   // Guardar en array de buffers personalizados
   customBuffers.push(customBuffer);
   
+  // NUEVO: Guardar estado después de crear
+  saveBuffersState();
+  
   // Hacer el buffer clickeable para ver métricas
   circle.on('click', (e) => {
     L.DomEvent.stopPropagation(e);
@@ -326,6 +394,9 @@ function deleteCustomBuffer(bufferId) {
   // Remover del array
   customBuffers.splice(index, 1);
   
+  // NUEVO: Guardar estado después de eliminar
+  saveBuffersState();
+  
   // Cerrar panel
   closeMetricsPanel();
   
@@ -374,6 +445,9 @@ function makeCustomBufferDraggable(circle, buffer) {
       buffer.currentPos = finalPos;
       buffer.lat = finalPos.lat;
       buffer.lng = finalPos.lng;
+      
+      // NUEVO: Guardar estado después de mover
+      saveBuffersState();
       
       showNotification(`Buffer reposicionado: ${finalPos.lat.toFixed(5)}, ${finalPos.lng.toFixed(5)}`, "success");
     };
@@ -535,6 +609,9 @@ function makeBufferDraggable(circle, ni, data) {
       
       const finalPos = circle.getLatLng();
       data.currentPos = finalPos;
+      
+      // NUEVO: Guardar estado después de mover
+      saveBuffersState();
       
       showNotification(`Buffer reposicionado: ${finalPos.lat.toFixed(5)}, ${finalPos.lng.toFixed(5)}`, "success");
       
@@ -755,11 +832,23 @@ function resetBufferPosition(ni) {
   data.circle.setLatLng([originalPos.lat, originalPos.lng]);
   data.currentPos = originalPos;
   
+  // NUEVO: Guardar estado después de restaurar
+  saveBuffersState();
+  
   showNotification("✓ Posición restaurada al núcleo original", "success");
   updateBufferMetricsLive(ni, originalPos);
 }
 
 window.resetBufferPosition = resetBufferPosition;
+
+function resetAllBuffersState() {
+  if (confirm('¿Estás seguro de que quieres reiniciar TODOS los buffers a su posición original y eliminar los buffers personalizados?\n\nEsta acción no se puede deshacer.')) {
+    clearBuffersState();
+    location.reload();
+  }
+}
+
+window.resetAllBuffersState = resetAllBuffersState;
 
 function showNotification(message, type = 'info') {
   const notification = document.createElement('div');
@@ -1167,11 +1256,26 @@ function drawNucleos(nucleos, selected) {
 }
 
 function drawBuffersEditable(nucleos, selected, nucleoStats) {
+  // NUEVO: Cargar estado guardado
+  const savedState = loadBuffersState();
+  const savedPositions = new Map();
+  
+  if (savedState && savedState.editableBuffers) {
+    savedState.editableBuffers.forEach(saved => {
+      savedPositions.set(saved.ni, { lat: saved.currentLat, lng: saved.currentLng });
+    });
+  }
+  
   selected.forEach(ni => {
     const n = nucleos[ni];
     const st = nucleoStats[ni];
+    
+    // NUEVO: Usar posición guardada si existe
+    const savedPos = savedPositions.get(ni);
+    const lat = savedPos ? savedPos.lat : n.lat;
+    const lng = savedPos ? savedPos.lng : n.lng;
 
-    const circle = L.circle([n.lat, n.lng], {
+    const circle = L.circle([lat, lng], {
       radius: BUFFER_RADIUS_M,
       color: '#58a6ff',
       fillColor: '#58a6ff',
@@ -1188,10 +1292,57 @@ function drawBuffersEditable(nucleos, selected, nucleoStats) {
       nucleo: n,
       stats: st,
       originalPos: { lat: n.lat, lng: n.lng },
-      currentPos: { lat: n.lat, lng: n.lng },
+      currentPos: { lat: lat, lng: lng },
       isDragging: false
     });
   });
+  
+  // NUEVO: Restaurar buffers personalizados
+  if (savedState && savedState.customBuffers) {
+    savedState.customBuffers.forEach(saved => {
+      restoreCustomBuffer(saved);
+    });
+  }
+}
+
+// NUEVO: Función para restaurar buffer personalizado desde localStorage
+function restoreCustomBuffer(saved) {
+  customBufferCounter++;
+  
+  const circle = L.circle([saved.lat, saved.lng], {
+    radius: BUFFER_RADIUS_M,
+    color: '#a371f7',
+    fillColor: '#a371f7',
+    weight: 2,
+    opacity: 0.7,
+    fillOpacity: 0.15,
+    renderer: canvasRenderer
+  });
+  
+  circle.addTo(layers.buffers);
+  
+  const customBuffer = {
+    id: saved.id,
+    circle: circle,
+    lat: saved.lat,
+    lng: saved.lng,
+    originalPos: { lat: saved.lat, lng: saved.lng },
+    currentPos: { lat: saved.lat, lng: saved.lng },
+    isCustom: true,
+    isDragging: false,
+    name: saved.name
+  };
+  
+  customBuffers.push(customBuffer);
+  
+  circle.on('click', (e) => {
+    L.DomEvent.stopPropagation(e);
+    showCustomBufferMetrics(customBuffer);
+  });
+  
+  if (editMode) {
+    makeCustomBufferDraggable(circle, customBuffer);
+  }
 }
 
 function drawSatellites(satellites, satCandidates, selected) {
