@@ -1137,3 +1137,36 @@ body {
     transform: translateY(-1px);
     box-shadow: 0 4px 8px rgba(248, 81, 73, 0.3);
 }
+
+/* Botón Guardar Cambios */
+.btn-save {
+    background: var(--accent-green);
+    border-color: var(--accent-green);
+    color: #fff;
+}
+
+.btn-save:hover {
+    background: #35a045;
+    border-color: #35a045;
+}
+
+/* Estado con cambios sin guardar */
+.btn-save.has-changes {
+    background: var(--accent-orange);
+    border-color: var(--accent-orange);
+    animation: pulse-save 2s infinite;
+}
+
+.btn-save.has-changes:hover {
+    background: #d67829;
+    border-color: #d67829;
+}
+
+@keyframes pulse-save {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(240, 136, 62, 0.7);
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(240, 136, 62, 0);
+    }
+}
