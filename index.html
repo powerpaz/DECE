@@ -86,7 +86,13 @@
                 </svg>
                 <span>Exportar</span>
             </button>
-            
+          <!-- NUEVO: Botón Barrido Inteligente -->
+            <button class="btn-action btn-sweep" id="btnIntelligentSweep" title="Barrido Inteligente">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                   <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+               </svg>
+           <span>Barrido Inteligente</span>
+           </button>  
             <button class="btn-action" id="btnOptimizar" title="Optimizar Núcleos">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
@@ -293,21 +299,38 @@
     <script src="app.js"></script>
     <!-- Panel de cobertura territorial flotante -->
 <div id="coverageToggleContainer"></div>
-
 <!-- Script de inicialización adicional -->
 <script>
+// Inicializar el botón de barrido inteligente
+document.getElementById('btnIntelligentSweep')?.addEventListener('click', () => {
+    if (window.performIntelligentSweep) {
+        window.performIntelligentSweep();
+    }
+});
+
+// Mostrar atajos de teclado al cargar
+setTimeout(() => {
+    if (window.showNotification) {
+        window.showNotification("💡 Atajos de teclado: Ctrl+D (borrar), Ctrl+B (barrido), Ctrl+P (progreso), Ctrl+T (cobertura)", "info", 5000);
+    }
+}, 3000);
+
 // Inicializar teclas rápidas adicionales
 document.addEventListener('keydown', (e) => {
     // Ctrl+Shift+P para ver progreso
     if (e.ctrlKey && e.shiftKey && e.key === 'P') {
         e.preventDefault();
-        showCoverageProgressPanel();
+        if (window.showCoverageProgressPanel) {
+            window.showCoverageProgressPanel();
+        }
     }
     
     // Ctrl+Shift+E para eliminar buffers vacíos
     if (e.ctrlKey && e.shiftKey && e.key === 'E') {
         e.preventDefault();
-        scanAndRemoveEmptyBuffers();
+        if (window.scanAndRemoveEmptyBuffers) {
+            window.scanAndRemoveEmptyBuffers();
+        }
     }
 });
 
@@ -320,3 +343,4 @@ setInterval(() => {
 </script>
 </body>
 </html>
+
