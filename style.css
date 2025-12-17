@@ -1115,3 +1115,25 @@ body {
     stroke: var(--accent-purple) !important;
     fill: var(--accent-purple) !important;
 }
+
+/* Botón reiniciar estado */
+.btn-reset-state {
+    width: 100%;
+    padding: 10px;
+    margin-top: 12px;
+    background: rgba(248, 81, 73, 0.1);
+    border: 1px solid var(--accent-red);
+    border-radius: 6px;
+    color: var(--accent-red);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-reset-state:hover {
+    background: var(--accent-red);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(248, 81, 73, 0.3);
+}
