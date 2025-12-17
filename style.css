@@ -2012,3 +2012,388 @@ input:checked + .slider {
 input:checked + .slider:before {
     transform: translateX(26px);
 }
+/* ==================== MEJORAS DE ELIMINACIÓN Y COBERTURA TERRITORIAL ==================== */
+
+/* Modo borrado mejorado */
+.delete-mode-active .leaflet-container {
+    cursor: not-allowed !important;
+}
+
+.buffer-to-delete {
+    animation: pulse-danger 1s ease-in-out infinite !important;
+    filter: brightness(1.2) !important;
+    box-shadow: 0 0 0 4px var(--accent-red) !important;
+    z-index: 1000 !important;
+}
+
+@keyframes pulse-danger {
+    0%, 100% { 
+        opacity: 0.8;
+        transform: scale(1);
+    }
+    50% { 
+        opacity: 1;
+        transform: scale(1.05);
+    }
+}
+
+/* Panel de confirmación de eliminación */
+.delete-confirm-panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--bg-panel);
+    border: 2px solid var(--accent-red);
+    border-radius: 12px;
+    padding: 20px;
+    z-index: 4000;
+    box-shadow: 0 10px 40px rgba(248, 81, 73, 0.3);
+    min-width: 300px;
+    max-width: 400px;
+}
+
+.delete-confirm-title {
+    color: var(--accent-red);
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.delete-confirm-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.btn-cancel-delete {
+    flex: 1;
+    padding: 10px;
+    background: var(--bg-dark);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+}
+
+.btn-cancel-delete:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent-blue);
+}
+
+.btn-confirm-delete {
+    flex: 1;
+    padding: 10px;
+    background: var(--accent-red);
+    border: 1px solid var(--accent-red);
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.btn-confirm-delete:hover {
+    background: #da3633;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(248, 81, 73, 0.3);
+}
+
+/* Capa de cobertura territorial - Toggle flotante */
+.coverage-toggle-panel {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 20px;
+    z-index: 1000;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    min-width: 350px;
+    justify-content: space-between;
+}
+
+.coverage-toggle-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.coverage-toggle-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.coverage-toggle-subtitle {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+/* Switch para cobertura territorial */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--bg-hover);
+    transition: .4s;
+    border-radius: 24px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 4px;
+    bottom: 4px;
+    background-color: var(--text-primary);
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: var(--accent-green);
+}
+
+input:checked + .slider:before {
+    transform: translateX(26px);
+}
+
+/* Panel de progreso de cobertura */
+.coverage-progress-panel {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    z-index: 2000;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    min-width: 300px;
+    max-width: 400px;
+}
+
+.coverage-progress-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 15px;
+}
+
+.coverage-progress-header h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.coverage-progress-stats {
+    margin-bottom: 20px;
+}
+
+.progress-value {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--accent-blue);
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.progress-bar-container {
+    height: 10px;
+    background: var(--bg-hover);
+    border-radius: 5px;
+    overflow: hidden;
+    margin: 15px 0;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-blue), var(--accent-green));
+    border-radius: 5px;
+    transition: width 0.5s ease;
+    width: 0%;
+}
+
+.progress-details {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.progress-detail-item {
+    text-align: center;
+    padding: 8px;
+    background: var(--bg-dark);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+}
+
+.detail-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: block;
+}
+
+.detail-label {
+    font-size: 10px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: block;
+    margin-top: 4px;
+}
+
+/* Buffers vacíos */
+.empty-buffer {
+    stroke-dasharray: 5,5 !important;
+    opacity: 0.3 !important;
+    filter: grayscale(0.8) !important;
+}
+
+.empty-buffer-marker {
+    animation: blink 2s ease-in-out infinite;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.7; }
+}
+
+/* Estados de cobertura territorial */
+.buffer-adjusted {
+    border-color: var(--accent-green) !important;
+    background-color: rgba(63, 185, 80, 0.15) !important;
+    box-shadow: 0 0 15px rgba(63, 185, 80, 0.3) !important;
+}
+
+.buffer-unadjusted {
+    border-color: var(--accent-red) !important;
+    background-color: rgba(248, 81, 73, 0.1) !important;
+    animation: pulse-unadjusted 3s ease-in-out infinite;
+}
+
+@keyframes pulse-unadjusted {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 0.9; }
+}
+
+.buffer-custom {
+    border-color: var(--accent-purple) !important;
+    background-color: rgba(163, 113, 247, 0.15) !important;
+}
+
+/* Botón de barrido inteligente */
+.btn-sweep {
+    background: linear-gradient(135deg, var(--accent-yellow), #d29922) !important;
+    box-shadow: 0 2px 8px rgba(210, 153, 34, 0.3) !important;
+}
+
+.btn-sweep:hover {
+    box-shadow: 0 4px 12px rgba(210, 153, 34, 0.4) !important;
+}
+
+.btn-sweep.active {
+    animation: pulse-sweep 2s ease-in-out infinite;
+}
+
+@keyframes pulse-sweep {
+    0%, 100% { 
+        box-shadow: 0 0 0 0 rgba(210, 153, 34, 0.7);
+    }
+    50% { 
+        box-shadow: 0 0 0 8px rgba(210, 153, 34, 0);
+    }
+}
+
+/* Indicador de teclado */
+.keyboard-hint {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    z-index: 999;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    opacity: 0.9;
+}
+
+.keyboard-key {
+    background: var(--bg-dark);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent-blue);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .coverage-toggle-panel {
+        min-width: calc(100% - 40px);
+        left: 20px;
+        right: 20px;
+        transform: none;
+        bottom: 10px;
+    }
+    
+    .coverage-progress-panel {
+        width: calc(100% - 40px);
+        left: 20px;
+        right: 20px;
+    }
+    
+    .delete-confirm-panel {
+        width: calc(100% - 40px);
+        left: 20px;
+        right: 20px;
+        transform: none;
+        top: 50%;
+    }
+}
