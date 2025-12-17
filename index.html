@@ -291,5 +291,32 @@
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <script src="app.js"></script>
+    <!-- Panel de cobertura territorial flotante -->
+<div id="coverageToggleContainer"></div>
+
+<!-- Script de inicialización adicional -->
+<script>
+// Inicializar teclas rápidas adicionales
+document.addEventListener('keydown', (e) => {
+    // Ctrl+Shift+P para ver progreso
+    if (e.ctrlKey && e.shiftKey && e.key === 'P') {
+        e.preventDefault();
+        showCoverageProgressPanel();
+    }
+    
+    // Ctrl+Shift+E para eliminar buffers vacíos
+    if (e.ctrlKey && e.shiftKey && e.key === 'E') {
+        e.preventDefault();
+        scanAndRemoveEmptyBuffers();
+    }
+});
+
+// Actualizar UI periódicamente
+setInterval(() => {
+    if (window.updateCoverageProgress) {
+        window.updateCoverageProgress();
+    }
+}, 30000); // Cada 30 segundos
+</script>
 </body>
 </html>
