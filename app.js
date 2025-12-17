@@ -1400,3 +1400,899 @@ window.cancelDeleteSelection = cancelDeleteSelection;
     </div>
 </div>
 */
+/*************************************************
+ * DECE Coverage App - v7.0 COBERTURA TERRITORIAL
+ * ✅ Tecla Suprimir/Delete para eliminar buffers
+ * ✅ Limpieza automática de buffers vacíos
+ * ✅ Capa de cobertura territorial (rompecabezas)
+ * ✅ Barrido inteligente del territorio
+ *************************************************/
+
+// ==================== VARIABLES GLOBALES NUEVAS ====================
+let selectedBufferForDelete = null;
+let coverageLayerEnabled = false;
+let adjustedBuffers = new Set(); // Buffers que ya fueron movidos
+let emptyBuffers = new Set(); // Buffers vacíos (sin instituciones)
+let bufferStats = new Map(); // Estadísticas de cada buffer
+let sweepMode = false; // Modo barrido inteligente
+let coverageProgressPanel = null;
+
+// ==================== INICIALIZACIÓN MEJORADA ====================
+document.addEventListener("DOMContentLoaded", () => {
+  if (_initialized) return;
+  _initialized = true;
+  initMap();
+  setupControls();
+  setupEditControls();
+  initKeyboardShortcuts();
+  initCoverageLayer();
+  loadCSV();
+});
+
+function initCoverageLayer() {
+  // Crear toggle de cobertura territorial
+  createCoverageToggle();
+  
+  // Inicializar eventos de teclado
+  initKeyboardShortcuts();
+  
+  // Actualizar progreso periódicamente
+  setInterval(updateCoverageProgress, 3000);
+}
+
+function createCoverageToggle() {
+  // Eliminar toggle anterior si existe
+  document.getElementById('coverageTogglePanel')?.remove();
+  
+  const togglePanel = document.createElement('div');
+  togglePanel.id = 'coverageTogglePanel';
+  togglePanel.className = 'coverage-toggle-panel';
+  togglePanel.innerHTML = `
+    <div class="coverage-toggle-info">
+      <div class="coverage-toggle-label">
+        <span>🧩 Cobertura Territorial</span>
+        <span id="coverageProgressText" style="font-size: 12px; color: var(--accent-blue);">0%</span>
+      </div>
+      <div class="coverage-toggle-subtitle" id="coverageSubtitle">0/0 buffers ajustados</div>
+    </div>
+    <label class="switch">
+      <input type="checkbox" id="toggleCoverageLayer" ${coverageLayerEnabled ? 'checked' : ''}>
+      <span class="slider"></span>
+    </label>
+  `;
+  
+  document.body.appendChild(togglePanel);
+  
+  // Event listener para el toggle
+  document.getElementById('toggleCoverageLayer').addEventListener('change', (e) => {
+    coverageLayerEnabled = e.target.checked;
+    toggleCoverageLayer();
+  });
+}
+
+// ==================== TECLADO Y ELIMINACIÓN MEJORADA ====================
+function initKeyboardShortcuts() {
+  document.addEventListener('keydown', handleKeyDown);
+}
+
+function handleKeyDown(e) {
+  // Suprimir o Delete para eliminar buffer seleccionado
+  if ((e.key === 'Delete' || e.key === 'Suprimir') && selectedBufferForDelete) {
+    e.preventDefault();
+    confirmDeleteSelectedBuffer();
+  }
+  
+  // Escape para cancelar selección
+  if (e.key === 'Escape') {
+    cancelDeleteSelection();
+  }
+  
+  // Ctrl+D para activar modo borrado
+  if (e.ctrlKey && e.key === 'd') {
+    e.preventDefault();
+    toggleDeleteMode();
+  }
+  
+  // Ctrl+B para barrido inteligente
+  if (e.ctrlKey && e.key === 'b') {
+    e.preventDefault();
+    performIntelligentSweep();
+  }
+  
+  // Ctrl+P para ver progreso
+  if (e.ctrlKey && e.key === 'p') {
+    e.preventDefault();
+    showCoverageProgressPanel();
+  }
+  
+  // Ctrl+T para toggle cobertura territorial
+  if (e.ctrlKey && e.key === 't') {
+    e.preventDefault();
+    document.getElementById('toggleCoverageLayer')?.click();
+  }
+}
+
+function selectBufferForDelete(bufferData, isCustom = false) {
+  // Limpiar selección anterior
+  cancelDeleteSelection();
+  
+  // Marcar nuevo buffer para eliminar
+  selectedBufferForDelete = { bufferData, isCustom };
+  
+  // Aplicar estilo de selección
+  bufferData.circle.setStyle({ 
+    color: '#f85149',
+    fillColor: '#f85149',
+    weight: 4,
+    opacity: 0.9,
+    fillOpacity: 0.3
+  });
+  
+  // Mostrar panel de confirmación
+  showDeleteConfirmPanel(bufferData);
+  
+  // Mostrar hint del teclado
+  showKeyboardHint("Presiona <strong>Suprimir</strong> para eliminar o <strong>ESC</strong> para cancelar");
+}
+
+function cancelDeleteSelection() {
+  if (selectedBufferForDelete) {
+    const { bufferData, isCustom } = selectedBufferForDelete;
+    
+    // Restaurar estilo original
+    if (isCustom) {
+      bufferData.circle.setStyle({ 
+        color: '#a371f7', 
+        fillColor: '#a371f7',
+        weight: 2,
+        opacity: 0.7,
+        fillOpacity: 0.15
+      });
+    } else {
+      bufferData.circle.setStyle({ 
+        color: editMode ? '#f0883e' : '#58a6ff', 
+        fillColor: editMode ? '#f0883e' : '#58a6ff',
+        weight: editMode ? 3 : 2,
+        opacity: editMode ? 0.6 : 0.6,
+        fillOpacity: editMode ? 0.2 : 0.08
+      });
+    }
+    
+    selectedBufferForDelete = null;
+  }
+  
+  // Ocultar panel de confirmación
+  document.querySelector('.delete-confirm-panel')?.remove();
+  
+  // Ocultar hint del teclado
+  hideKeyboardHint();
+}
+
+function confirmDeleteSelectedBuffer() {
+  if (!selectedBufferForDelete) return;
+  
+  const { bufferData, isCustom } = selectedBufferForDelete;
+  
+  if (isCustom) {
+    deleteCustomBuffer(bufferData.id);
+    showNotification("✅ Buffer personalizado eliminado", "success");
+  } else {
+    showNotification("⚠️ Los buffers de núcleo no se pueden eliminar", "error");
+  }
+  
+  cancelDeleteSelection();
+}
+
+function showDeleteConfirmPanel(bufferData) {
+  // Eliminar panel anterior si existe
+  document.querySelector('.delete-confirm-panel')?.remove();
+  
+  const panel = document.createElement('div');
+  panel.className = 'delete-confirm-panel';
+  panel.innerHTML = `
+    <div class="delete-confirm-title">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+        <line x1="10" y1="11" x2="10" y2="17"/>
+        <line x1="14" y1="11" x2="14" y2="17"/>
+      </svg>
+      ¿Eliminar buffer?
+    </div>
+    <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
+      <strong>${bufferData.name || 'Buffer'}</strong> será eliminado permanentemente.
+    </div>
+    <div class="delete-confirm-buttons">
+      <button class="btn-cancel-delete" onclick="cancelDeleteSelection()">Cancelar (ESC)</button>
+      <button class="btn-confirm-delete" onclick="confirmDeleteSelectedBuffer()">Eliminar (Suprimir)</button>
+    </div>
+  `;
+  
+  document.body.appendChild(panel);
+}
+
+function showKeyboardHint(message) {
+  // Eliminar hint anterior
+  hideKeyboardHint();
+  
+  const hint = document.createElement('div');
+  hint.className = 'keyboard-hint';
+  hint.innerHTML = `<span>${message}</span>`;
+  document.body.appendChild(hint);
+}
+
+function hideKeyboardHint() {
+  document.querySelector('.keyboard-hint')?.remove();
+}
+
+// ==================== LIMPIEZA DE BUFFERS VACÍOS ====================
+function scanAndRemoveEmptyBuffers() {
+  showNotification("🔍 Escaneando buffers vacíos...", "info");
+  
+  let removedCount = 0;
+  const emptyCustomBuffers = [];
+  
+  // Escanear buffers personalizados
+  customBuffers.forEach(buffer => {
+    const metrics = calculateBufferMetricsDetailed(buffer.circle.getLatLng(), BUFFER_RADIUS_M);
+    if (metrics.iesCount === 0) {
+      emptyCustomBuffers.push(buffer);
+    }
+  });
+  
+  // Eliminar buffers personalizados vacíos
+  emptyCustomBuffers.forEach(buffer => {
+    deleteCustomBuffer(buffer.id);
+    removedCount++;
+  });
+  
+  // Marcar buffers de núcleo vacíos (sin eliminar)
+  editableBuffers.forEach((data, ni) => {
+    const metrics = calculateBufferMetricsDetailed(data.circle.getLatLng(), BUFFER_RADIUS_M);
+    if (metrics.iesCount === 0) {
+      emptyBuffers.add(ni);
+      data.circle.setStyle({ 
+        color: '#6e7681', 
+        fillColor: '#6e7681',
+        opacity: 0.3,
+        fillOpacity: 0.05,
+        weight: 1,
+        dashArray: '5,5'
+      });
+      data.circle.addClass('empty-buffer');
+    } else {
+      emptyBuffers.delete(ni);
+      data.circle.removeClass('empty-buffer');
+    }
+  });
+  
+  // Recalcular todo
+  regenerateAnimations();
+  updateCoverageProgress();
+  
+  if (removedCount > 0) {
+    showNotification(`✅ Eliminados ${removedCount} buffers vacíos`, "success");
+    markAsChanged();
+  } else {
+    showNotification("ℹ️ No se encontraron buffers vacíos para eliminar", "info");
+  }
+}
+
+// ==================== BARRIDO INTELIGENTE ====================
+function performIntelligentSweep() {
+  showNotification("🌀 Realizando barrido inteligente...", "info");
+  
+  // 1. Eliminar buffers vacíos
+  scanAndRemoveEmptyBuffers();
+  
+  // 2. Identificar áreas sin cobertura
+  const uncovered = findUncoveredSatellites();
+  
+  // 3. Crear buffers estratégicos
+  if (uncovered.length > 0) {
+    const optimalPositions = findOptimalBufferPositions(uncovered);
+    optimalPositions.forEach(pos => {
+      createStrategicBuffer(pos.lat, pos.lng);
+    });
+    
+    showNotification(`🎯 Creados ${optimalPositions.length} buffers estratégicos`, "success");
+  }
+  
+  // 4. Optimizar buffers existentes
+  optimizeExistingBuffers();
+  
+  // 5. Actualizar visualización
+  updateCoverageVisualization();
+  updateCoverageProgress();
+  
+  showNotification("✅ Barrido inteligente completado", "success");
+}
+
+function findOptimalBufferPositions(uncoveredSatellites) {
+  const positions = [];
+  const minDistance = BUFFER_RADIUS_M * 1.2; // Distancia mínima entre buffers
+  
+  // Agrupar satélites no cubiertos por proximidad
+  const clusters = [];
+  uncoveredSatellites.forEach(sat => {
+    let addedToCluster = false;
+    
+    // Buscar cluster cercano
+    for (const cluster of clusters) {
+      const avgLat = cluster.reduce((sum, s) => sum + s.lat, 0) / cluster.length;
+      const avgLng = cluster.reduce((sum, s) => sum + s.lng, 0) / cluster.length;
+      const dist = haversineMeters(sat.lat, sat.lng, avgLat, avgLng);
+      
+      if (dist < BUFFER_RADIUS_M) {
+        cluster.push(sat);
+        addedToCluster = true;
+        break;
+      }
+    }
+    
+    // Si no hay cluster cercano, crear uno nuevo
+    if (!addedToCluster) {
+      clusters.push([sat]);
+    }
+  });
+  
+  // Para cada cluster, encontrar posición óptima
+  clusters.forEach(cluster => {
+    if (cluster.length >= 3) { // Solo crear buffer si hay al menos 3 satélites
+      // Calcular centroide del cluster
+      const centerLat = cluster.reduce((sum, sat) => sum + sat.lat, 0) / cluster.length;
+      const centerLng = cluster.reduce((sum, sat) => sum + sat.lng, 0) / cluster.length;
+      
+      // Verificar que no esté demasiado cerca de buffers existentes
+      let tooClose = false;
+      
+      editableBuffers.forEach(data => {
+        const pos = data.circle.getLatLng();
+        if (haversineMeters(centerLat, centerLng, pos.lat, pos.lng) < minDistance) {
+          tooClose = true;
+        }
+      });
+      
+      customBuffers.forEach(buffer => {
+        const pos = buffer.circle.getLatLng();
+        if (haversineMeters(centerLat, centerLng, pos.lat, pos.lng) < minDistance) {
+          tooClose = true;
+        }
+      });
+      
+      if (!tooClose) {
+        positions.push({ lat: centerLat, lng: centerLng });
+      }
+    }
+  });
+  
+  return positions;
+}
+
+function createStrategicBuffer(lat, lng) {
+  customBufferCounter++;
+  const circle = L.circle([lat, lng], { 
+    radius: BUFFER_RADIUS_M, 
+    color: '#a371f7', 
+    fillColor: '#a371f7', 
+    weight: 3, 
+    opacity: 0.8, 
+    fillOpacity: 0.2,
+    renderer: canvasRenderer 
+  });
+  
+  circle.addTo(layers.buffers);
+  
+  const buffer = { 
+    id: `strategic_${customBufferCounter}`, 
+    circle, 
+    lat, 
+    lng, 
+    originalPos: { lat, lng }, 
+    currentPos: { lat, lng }, 
+    isCustom: true, 
+    isDragging: false, 
+    name: `Buffer Estratégico #${customBufferCounter}` 
+  };
+  
+  customBuffers.push(buffer);
+  markAsChanged();
+  
+  circle.on('click', (e) => { 
+    L.DomEvent.stopPropagation(e); 
+    showBufferPopup(buffer, true); 
+  });
+  
+  const metrics = calculateBufferMetrics({ lat, lng }, BUFFER_RADIUS_M);
+  showNotification(`🎯 Buffer estratégico creado: ${metrics.iesCount} IEs cubiertas`, "info");
+  
+  setTimeout(() => regenerateAnimations(), 100);
+  if (editMode) makeBufferDraggable(circle, buffer, true);
+}
+
+function optimizeExistingBuffers() {
+  // Optimizar posición de buffers existentes para maximizar cobertura
+  let optimizedCount = 0;
+  
+  editableBuffers.forEach((data, ni) => {
+    // Solo optimizar buffers no vacíos
+    if (!emptyBuffers.has(ni)) {
+      const currentPos = data.circle.getLatLng();
+      const optimalPos = findOptimalPositionForBuffer(ni, currentPos);
+      
+      // Si la nueva posición es significativamente mejor, mover el buffer
+      if (optimalPos && haversineMeters(currentPos.lat, currentPos.lng, optimalPos.lat, optimalPos.lng) > 500) {
+        data.circle.setLatLng([optimalPos.lat, optimalPos.lng]);
+        data.currentPos = optimalPos;
+        optimizedCount++;
+        adjustedBuffers.add(ni);
+      }
+    }
+  });
+  
+  if (optimizedCount > 0) {
+    markAsChanged();
+    regenerateAnimations();
+    showNotification(`⚡ Optimizados ${optimizedCount} buffers existentes`, "success");
+  }
+}
+
+function findOptimalPositionForBuffer(ni, currentPos) {
+  // Encontrar posición óptima para un buffer basado en las instituciones que cubre
+  const bufferData = editableBuffers.get(ni);
+  if (!bufferData || !bufferData.stats) return null;
+  
+  const institutions = getInstitutionsInBuffer(currentPos);
+  if (institutions.length === 0) return null;
+  
+  // Calcular centroide de las instituciones cubiertas
+  const avgLat = institutions.reduce((sum, inst) => sum + inst.lat, 0) / institutions.length;
+  const avgLng = institutions.reduce((sum, inst) => sum + inst.lng, 0) / institutions.length;
+  
+  return { lat: avgLat, lng: avgLng };
+}
+
+function getInstitutionsInBuffer(position) {
+  if (!globalData) return [];
+  
+  const institutions = [];
+  const radius = BUFFER_RADIUS_M;
+  
+  globalData.satellites.forEach(sat => {
+    const dist = haversineMeters(position.lat, position.lng, sat.lat, sat.lng);
+    if (dist <= radius) {
+      institutions.push({ ...sat, type: 'satellite' });
+    }
+  });
+  
+  globalData.nucleos.forEach(nuc => {
+    const dist = haversineMeters(position.lat, position.lng, nuc.lat, nuc.lng);
+    if (dist <= radius) {
+      institutions.push({ ...nuc, type: 'nucleo' });
+    }
+  });
+  
+  return institutions;
+}
+
+// ==================== CAPA DE COBERTURA TERRITORIAL ====================
+function toggleCoverageLayer() {
+  if (coverageLayerEnabled) {
+    showNotification("🧩 Capa de cobertura territorial activada", "info");
+    updateCoverageVisualization();
+    document.body.classList.add('coverage-mode');
+  } else {
+    showNotification("Capa de cobertura desactivada", "info");
+    resetCoverageVisualization();
+    document.body.classList.remove('coverage-mode');
+  }
+}
+
+function updateCoverageVisualization() {
+  // Actualizar todos los buffers según su estado
+  editableBuffers.forEach((data, ni) => {
+    const isAdjusted = adjustedBuffers.has(ni);
+    const isEmpty = emptyBuffers.has(ni);
+    
+    if (isEmpty) {
+      // Buffers vacíos - estilo tenue
+      data.circle.setStyle({ 
+        color: '#6e7681',
+        fillColor: '#6e7681',
+        opacity: 0.3,
+        fillOpacity: 0.05,
+        weight: 1,
+        dashArray: '5,5'
+      });
+    } else if (isAdjusted) {
+      // Buffers ajustados - verde brillante
+      data.circle.setStyle({ 
+        color: '#3fb950',
+        fillColor: '#3fb950',
+        opacity: 0.8,
+        fillOpacity: 0.2,
+        weight: 3
+      });
+      data.circle.addClass('buffer-adjusted');
+      data.circle.removeClass('buffer-unadjusted');
+    } else {
+      // Buffers sin ajustar - rojo/anaranjado
+      data.circle.setStyle({ 
+        color: '#f85149',
+        fillColor: '#f85149',
+        opacity: 0.7,
+        fillOpacity: 0.15,
+        weight: 2
+      });
+      data.circle.addClass('buffer-unadjusted');
+      data.circle.removeClass('buffer-adjusted');
+    }
+  });
+  
+  // Buffers personalizados - púrpura
+  customBuffers.forEach(buffer => {
+    buffer.circle.setStyle({ 
+      color: '#a371f7',
+      fillColor: '#a371f7',
+      opacity: 0.7,
+      fillOpacity: 0.15,
+      weight: 2
+    });
+    buffer.circle.addClass('buffer-custom');
+  });
+}
+
+function resetCoverageVisualization() {
+  // Restaurar estilos originales
+  editableBuffers.forEach((data, ni) => {
+    const isEmpty = emptyBuffers.has(ni);
+    
+    data.circle.removeClass('buffer-adjusted');
+    data.circle.removeClass('buffer-unadjusted');
+    data.circle.removeClass('buffer-custom');
+    
+    if (isEmpty) {
+      data.circle.setStyle({ 
+        color: '#6e7681', 
+        fillColor: '#6e7681',
+        opacity: 0.3,
+        fillOpacity: 0.05,
+        weight: 1,
+        dashArray: '5,5'
+      });
+    } else {
+      data.circle.setStyle({ 
+        color: editMode ? '#f0883e' : '#58a6ff', 
+        fillColor: editMode ? '#f0883e' : '#58a6ff',
+        opacity: editMode ? 0.6 : 0.6,
+        fillOpacity: editMode ? 0.2 : 0.08,
+        weight: editMode ? 3 : 2,
+        dashArray: null
+      });
+    }
+  });
+  
+  customBuffers.forEach(buffer => {
+    buffer.circle.removeClass('buffer-custom');
+    buffer.circle.setStyle({ 
+      color: '#a371f7', 
+      fillColor: '#a371f7',
+      opacity: 0.7,
+      fillOpacity: 0.15,
+      weight: 2
+    });
+  });
+}
+
+function updateAdjustedBuffers() {
+  // Un buffer se considera "ajustado" si ha sido movido de su posición original
+  editableBuffers.forEach((data, ni) => {
+    const pos = data.circle.getLatLng();
+    const originalPos = data.originalPos;
+    
+    const wasMoved = haversineMeters(pos.lat, pos.lng, originalPos.lat, originalPos.lng) > 100; // Más de 100 metros
+    
+    if (wasMoved) {
+      adjustedBuffers.add(ni);
+    } else {
+      adjustedBuffers.delete(ni);
+    }
+  });
+}
+
+function updateCoverageProgress() {
+  updateAdjustedBuffers();
+  
+  const totalBuffers = editableBuffers.size;
+  const emptyCount = emptyBuffers.size;
+  const activeCount = totalBuffers - emptyCount;
+  const adjustedCount = adjustedBuffers.size;
+  const percentage = activeCount > 0 ? Math.round((adjustedCount / activeCount) * 100) : 0;
+  
+  // Actualizar toggle
+  const progressText = document.getElementById('coverageProgressText');
+  const subtitle = document.getElementById('coverageSubtitle');
+  
+  if (progressText) {
+    progressText.textContent = `${percentage}%`;
+    progressText.style.color = percentage === 100 ? 'var(--accent-green)' : 
+                              percentage >= 75 ? 'var(--accent-blue)' : 
+                              percentage >= 50 ? 'var(--accent-yellow)' : 
+                              'var(--accent-red)';
+  }
+  
+  if (subtitle) {
+    subtitle.textContent = `${adjustedCount}/${activeCount} buffers ajustados`;
+    subtitle.style.color = percentage === 100 ? 'var(--accent-green)' : 'var(--text-secondary)';
+  }
+  
+  // Si llegamos al 100%, mostrar notificación especial
+  if (percentage === 100 && activeCount > 0) {
+    const togglePanel = document.getElementById('coverageTogglePanel');
+    if (togglePanel) {
+      togglePanel.style.borderColor = 'var(--accent-green)';
+      togglePanel.style.boxShadow = '0 0 20px rgba(63, 185, 80, 0.5)';
+    }
+    
+    // Mostrar notificación una sola vez
+    if (!localStorage.getItem('coverage100_notified')) {
+      showNotification("🎉 ¡Felicidades! Cobertura territorial completa al 100%", "success");
+      localStorage.setItem('coverage100_notified', 'true');
+    }
+  } else {
+    const togglePanel = document.getElementById('coverageTogglePanel');
+    if (togglePanel) {
+      togglePanel.style.borderColor = '';
+      togglePanel.style.boxShadow = '';
+    }
+    localStorage.removeItem('coverage100_notified');
+  }
+  
+  return { totalBuffers, adjustedCount, emptyCount, percentage };
+}
+
+function showCoverageProgressPanel() {
+  const stats = updateCoverageProgress();
+  
+  // Eliminar panel anterior si existe
+  document.querySelector('.coverage-progress-panel')?.remove();
+  
+  const panel = document.createElement('div');
+  panel.className = 'coverage-progress-panel';
+  panel.innerHTML = `
+    <div class="coverage-progress-header">
+      <h3>📊 Progreso de Cobertura</h3>
+      <button class="close-btn" onclick="this.closest('.coverage-progress-panel').remove()">×</button>
+    </div>
+    
+    <div class="coverage-progress-stats">
+      <div class="progress-value">${stats.percentage}%</div>
+      <div class="progress-bar-container">
+        <div class="progress-bar-fill" style="width: ${stats.percentage}%"></div>
+      </div>
+      
+      <div class="progress-details">
+        <div class="progress-detail-item">
+          <span class="detail-value">${stats.adjustedCount}</span>
+          <span class="detail-label">Ajustados</span>
+        </div>
+        <div class="progress-detail-item">
+          <span class="detail-value">${stats.emptyCount}</span>
+          <span class="detail-label">Vacíos</span>
+        </div>
+        <div class="progress-detail-item">
+          <span class="detail-value">${stats.totalBuffers}</span>
+          <span class="detail-label">Totales</span>
+        </div>
+      </div>
+    </div>
+    
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <button class="btn-action" onclick="scanAndRemoveEmptyBuffers()" style="width: 100%;">
+        🗑️ Eliminar Buffers Vacíos
+      </button>
+      <button class="btn-action btn-sweep" onclick="performIntelligentSweep()" style="width: 100%;">
+        🌀 Barrido Inteligente
+      </button>
+      <button class="btn-action" onclick="completeCoverage()" style="width: 100%;">
+        🎯 Completar Cobertura
+      </button>
+      ${stats.percentage === 100 ? `
+      <button class="btn-action btn-export" onclick="showExportModal()" style="width: 100%; background: var(--accent-green);">
+        📤 Exportar Análisis Completo
+      </button>
+      ` : ''}
+    </div>
+  `;
+  
+  document.body.appendChild(panel);
+  coverageProgressPanel = panel;
+}
+
+// ==================== MODIFICACIONES A FUNCIONES EXISTENTES ====================
+
+// Modificar enableDeleteMode para usar nueva interfaz
+function enableDeleteMode() {
+  deleteMode = true;
+  const btn = document.getElementById("btnDeleteBuffers");
+  if (btn) btn.classList.add("active");
+  
+  document.body.classList.add('delete-mode-active');
+  
+  // Hacer los buffers personalizados clickeables para seleccionar para eliminar
+  customBuffers.forEach(buffer => {
+    buffer.circle.off('click');
+    buffer.circle.on('click', (e) => {
+      L.DomEvent.stopPropagation(e);
+      if (deleteMode) {
+        selectBufferForDelete(buffer, true);
+      }
+    });
+  });
+  
+  // También para buffers editables (núcleos)
+  editableBuffers.forEach((data, ni) => {
+    data.circle.off('click');
+    data.circle.on('click', (e) => {
+      L.DomEvent.stopPropagation(e);
+      if (deleteMode) {
+        selectBufferForDelete({...data, name: `Núcleo ${ni}`}, false);
+      }
+    });
+  });
+  
+  showNotification("🗑️ Modo borrado activado. Haz clic en un buffer y presiona Suprimir para eliminar.", "info");
+}
+
+// Modificar disableDeleteMode
+function disableDeleteMode() {
+  deleteMode = false;
+  const btn = document.getElementById("btnDeleteBuffers");
+  if (btn) btn.classList.remove("active");
+  
+  document.body.classList.remove('delete-mode-active');
+  cancelDeleteSelection();
+  
+  // Restaurar comportamiento normal
+  customBuffers.forEach(buffer => {
+    buffer.circle.off('click');
+    buffer.circle.on('click', (e) => { 
+      L.DomEvent.stopPropagation(e); 
+      showBufferPopup(buffer, true); 
+    });
+  });
+  
+  editableBuffers.forEach((data, ni) => {
+    data.circle.off('click');
+    data.circle.on('click', (e) => { 
+      if (!editMode) showBufferPopup(data, false); 
+    });
+  });
+}
+
+// Modificar makeBufferDraggable para rastrear ajustes
+function makeBufferDraggable(circle, data, isCustom, ni = null) {
+  let isDragging = false;
+  let startPos = null;
+  
+  circle.on('mousedown', function(e) {
+    if (!editMode) return;
+    isDragging = true; 
+    data.isDragging = true;
+    startPos = circle.getLatLng();
+    map.dragging.disable();
+    circle.setStyle({ weight: 4, fillOpacity: 0.3 });
+    
+    const onMove = (e) => { 
+      if (isDragging) circle.setLatLng(e.latlng); 
+    };
+    
+    const onUp = () => {
+      isDragging = false; 
+      data.isDragging = false;
+      map.dragging.enable();
+      circle.setStyle({ 
+        weight: isCustom ? 2 : 3, 
+        fillOpacity: isCustom ? 0.15 : 0.2 
+      });
+      map.off('mousemove', onMove); 
+      map.off('mouseup', onUp);
+      
+      const endPos = circle.getLatLng();
+      data.currentPos = endPos;
+      if (isCustom) { 
+        data.lat = endPos.lat; 
+        data.lng = endPos.lng; 
+      }
+      
+      // Marcar como ajustado si se movió significativamente
+      if (startPos && haversineMeters(startPos.lat, startPos.lng, endPos.lat, endPos.lng) > 100) {
+        if (ni !== null) {
+          adjustedBuffers.add(ni);
+          // Remover de buffers vacíos si estaba marcado como tal
+          emptyBuffers.delete(ni);
+          circle.removeClass('empty-buffer');
+          circle.setStyle({ dashArray: null });
+        }
+        updateCoverageProgress();
+      }
+      
+      markAsChanged();
+      regenerateAnimations();
+      showNotification("✅ Buffer reposicionado", "success");
+    };
+    
+    map.on('mousemove', onMove);
+    map.on('mouseup', onUp);
+  });
+}
+
+// Modificar drawBuffersEditable para inicializar emptyBuffers
+function drawBuffersEditable(nucleos, selected, nucleoStats) {
+  const savedState = loadBuffersState();
+  const savedPositions = new Map();
+  if (savedState?.editableBuffers) savedState.editableBuffers.forEach(s => savedPositions.set(s.ni, { lat: s.currentLat, lng: s.currentLng }));
+  
+  selected.forEach(ni => {
+    const n = nucleos[ni], st = nucleoStats[ni];
+    const savedPos = savedPositions.get(ni);
+    const lat = savedPos ? savedPos.lat : n.lat, lng = savedPos ? savedPos.lng : n.lng;
+    const circle = L.circle([lat, lng], { 
+      radius: BUFFER_RADIUS_M, 
+      color: '#58a6ff', 
+      fillColor: '#58a6ff', 
+      weight: 2, 
+      opacity: 0.6, 
+      fillOpacity: 0.08, 
+      renderer: canvasRenderer 
+    });
+    circle.addTo(layers.buffers);
+    circle.on('click', (e) => { if (!editMode) showBufferPopup(editableBuffers.get(ni), false); });
+    editableBuffers.set(ni, { 
+      circle, 
+      nucleo: n, 
+      stats: st, 
+      originalPos: { lat: n.lat, lng: n.lng }, 
+      currentPos: { lat, lng }, 
+      isDragging: false 
+    });
+    
+    // Verificar si está vacío inicialmente
+    const metrics = calculateBufferMetricsDetailed({lat, lng}, BUFFER_RADIUS_M);
+    if (metrics.iesCount === 0) {
+      emptyBuffers.add(ni);
+      circle.setStyle({ 
+        color: '#6e7681', 
+        fillColor: '#6e7681',
+        opacity: 0.3,
+        fillOpacity: 0.05,
+        weight: 1,
+        dashArray: '5,5'
+      });
+      circle.addClass('empty-buffer');
+    }
+    
+    // Verificar si fue movido (ajustado)
+    if (savedPos && haversineMeters(lat, lng, n.lat, n.lng) > 100) {
+      adjustedBuffers.add(ni);
+    }
+  });
+  
+  if (savedState?.customBuffers) savedState.customBuffers.forEach(s => restoreCustomBuffer(s));
+  
+  // Inicializar capa de cobertura
+  setTimeout(() => {
+    updateCoverageProgress();
+    if (coverageLayerEnabled) {
+      updateCoverageVisualization();
+    }
+  }, 1000);
+}
+
+// ==================== FUNCIONES NUEVAS PARA LA INTERFAZ ====================
+window.scanAndRemoveEmptyBuffers = scanAndRemoveEmptyBuffers;
+window.performIntelligentSweep = performIntelligentSweep;
+window.showCoverageProgressPanel = showCoverageProgressPanel;
+window.selectBufferForDelete = selectBufferForDelete;
+window.confirmDeleteSelectedBuffer = confirmDeleteSelectedBuffer;
+window.cancelDeleteSelection = cancelDeleteSelection;
