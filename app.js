@@ -1961,65 +1961,47 @@ function stopAnimations() {
 }
 
 /****************************************************
- * EXTENSIÓN QA – SPATIAL JOIN + EXPORTACIÓN
- * (NO interfiere con lógica existente)
+ * QA EXTENSION – EXPORTACIÓN DE RESULTADOS
  ****************************************************/
 
-// Almacén de resultados por buffer
-window.DECE_SPATIAL_RESULTS = [];
-
-// Ejecuta spatial join usando buffers ya dibujados
-function runSpatialJoinAndCollect() {
-  const results = [];
-
-  if (!layers || !layers.buffers || !layers.satellites) {
-    console.warn("Capas no disponibles para spatial join");
-    return [];
-  }
-
-  layers.buffers.eachLayer(buffer => {
-    const nucleo = buffer._nucleoData; // lo asignamos abajo
-    const inside = [];
-
-    layers.satellites.eachLayer(sat => {
-      if (buffer.getBounds().contains(sat.getLatLng())) {
-        inside.push(sat._data || {});
-      }
-    });
-
-    results.push({
-      nucleo_amie: nucleo?.amie || "",
-      nucleo_nombre: nucleo?.nombre || "",
-      total_satellites: inside.length,
-      amies_satellite: inside.map(s => s.amie).join("|"),
-      estudiantes: inside.reduce((a, b) => a + (b.estudiantes || 0), 0)
-    });
-  });
-
-  window.DECE_SPATIAL_RESULTS = results;
-  return results;
-}
-
-// Exportar resultados
-function exportSpatialResults(format = "csv") {
-  const data = runSpatialJoinAndCollect();
-  if (!data.length) {
-    alert("No hay resultados para exportar");
+function DECE_exportResults() {
+  if (!window.DECE_SPATIAL_RESULTS || !window.DECE_SPATIAL_RESULTS.length) {
+    alert("No hay resultados para exportar. Verifica buffers y datos.");
     return;
   }
 
-  if (format === "csv") {
-    downloadFile(Papa.unparse(data), "DECE_resultados.csv");
-  } else if (format === "json") {
-    downloadFile(JSON.stringify(data, null, 2), "DECE_resultados.json");
-  }
+  const csv = Papa.unparse(window.DECE_SPATIAL_RESULTS);
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "DECE_resultados.csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
-// Utilidad descarga
-function downloadFile(content, filename) {
-  const blob = new Blob([content], { type: "text/plain" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  a.click();
-}
+/****************************************************
+ * QA EXTENSION – ENGANCHE DEL BOTÓN EXPORTAR
+ ****************************************************/
+
+document.addEventListener("DOMContentLoaded", () => {
+  const btn = document.getElementById("btnOptimizar");
+
+  if (!btn) {
+    console.warn("Botón btnOptimizar no encontrado en el DOM");
+    return;
+  }
+
+  // Elimina listeners previos (si los hay)
+  btn.replaceWith(btn.cloneNode(true));
+
+  const newBtn = document.getElementById("btnOptimizar");
+
+  newBtn.addEventListener("click", () => {
+    console.log("Exportar resultados DECE");
+    DECE_exportResults();
+  });
+});
