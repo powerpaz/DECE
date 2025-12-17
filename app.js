@@ -850,3 +850,553 @@ function setupControls() {
   });
   setTimeout(() => document.getElementById("statsPanel")?.classList.add("active"), 500);
 }
+// ==================== VARIABLES GLOBALES AÑADIDAS ====================
+let selectedBufferForDelete = null;
+let coverageLayerEnabled = false;
+let adjustedBuffers = new Set();
+let emptyBuffers = new Set();
+let coverageProgressInterval = null;
+
+// ==================== MEJORA ELIMINACIÓN CON TECLADO ====================
+function initKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+        // Suprimir o Delete para eliminar buffer seleccionado
+        if ((e.key === 'Delete' || e.key === 'Suprimir') && selectedBufferForDelete) {
+            confirmDeleteSelectedBuffer();
+        }
+        
+        // Escape para cancelar selección
+        if (e.key === 'Escape') {
+            cancelDeleteSelection();
+        }
+        
+        // Ctrl+D para activar modo borrado
+        if (e.ctrlKey && e.key === 'd') {
+            e.preventDefault();
+            toggleDeleteMode();
+        }
+    });
+}
+
+function selectBufferForDelete(bufferData, isCustom = false) {
+    // Limpiar selección anterior
+    cancelDeleteSelection();
+    
+    // Marcar nuevo buffer para eliminar
+    selectedBufferForDelete = { bufferData, isCustom };
+    bufferData.circle.addClass('buffer-to-delete');
+    
+    // Mostrar panel de confirmación
+    showDeleteConfirmPanel(bufferData);
+}
+
+function cancelDeleteSelection() {
+    if (selectedBufferForDelete) {
+        selectedBufferForDelete.bufferData.circle.removeClass('buffer-to-delete');
+        selectedBufferForDelete = null;
+    }
+    document.querySelector('.delete-confirm-panel')?.remove();
+}
+
+function confirmDeleteSelectedBuffer() {
+    if (!selectedBufferForDelete) return;
+    
+    const { bufferData, isCustom } = selectedBufferForDelete;
+    
+    if (isCustom) {
+        deleteCustomBuffer(bufferData.id);
+    } else {
+        showNotification("⚠️ Los buffers de núcleo no se pueden eliminar, solo mover", "error");
+    }
+    
+    cancelDeleteSelection();
+}
+
+function showDeleteConfirmPanel(bufferData) {
+    // Eliminar panel anterior si existe
+    document.querySelector('.delete-confirm-panel')?.remove();
+    
+    const panel = document.createElement('div');
+    panel.className = 'delete-confirm-panel';
+    panel.innerHTML = `
+        <div class="delete-confirm-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                <line x1="10" y1="11" x2="10" y2="17"/>
+                <line x1="14" y1="11" x2="14" y2="17"/>
+            </svg>
+            ¿Eliminar buffer?
+        </div>
+        <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
+            ${bufferData.name || 'Buffer'} será eliminado permanentemente.
+        </div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 16px;">
+            Presiona <strong>Suprimir</strong> para confirmar o <strong>ESC</strong> para cancelar
+        </div>
+        <div class="delete-confirm-buttons">
+            <button class="btn-cancel-delete" onclick="cancelDeleteSelection()">Cancelar (ESC)</button>
+            <button class="btn-confirm-delete" onclick="confirmDeleteSelectedBuffer()">Eliminar (Suprimir)</button>
+        </div>
+    `;
+    
+    document.body.appendChild(panel);
+}
+
+// ==================== LIMPIEZA AUTOMÁTICA DE BUFFERS VACÍOS ====================
+function scanAndRemoveEmptyBuffers() {
+    showNotification("🔍 Escaneando buffers vacíos...", "info");
+    
+    let removedCount = 0;
+    const buffersToCheck = [...editableBuffers.entries(), ...customBuffers.map(b => [b.id, b])];
+    
+    buffersToCheck.forEach(([id, bufferData]) => {
+        const metrics = calculateBufferMetricsDetailed(bufferData.circle.getLatLng(), BUFFER_RADIUS_M);
+        
+        if (metrics.iesCount === 0) {
+            if (bufferData.isCustom) {
+                deleteCustomBuffer(bufferData.id);
+                removedCount++;
+            } else {
+                // Para buffers de núcleo, marcamos como vacío pero no eliminamos
+                emptyBuffers.add(id);
+                bufferData.circle.setStyle({ 
+                    color: '#6e7681', 
+                    fillColor: '#6e7681',
+                    opacity: 0.3,
+                    fillOpacity: 0.05,
+                    dashArray: '5,5'
+                });
+            }
+        } else {
+            emptyBuffers.delete(id);
+        }
+    });
+    
+    // Recalcular cobertura
+    regenerateAnimations();
+    updateCoverageProgress();
+    
+    if (removedCount > 0) {
+        showNotification(`✅ Eliminados ${removedCount} buffers vacíos`, "success");
+        markAsChanged();
+    } else {
+        showNotification("ℹ️ No se encontraron buffers vacíos", "info");
+    }
+}
+
+// ==================== CAPA DE COBERTURA TERRITORIAL ====================
+function initCoverageLayer() {
+    // Crear toggle en la interfaz
+    createCoverageToggle();
+    
+    // Inicializar seguimiento de buffers ajustados
+    updateAdjustedBuffers();
+    
+    // Actualizar progreso cada 5 segundos
+    coverageProgressInterval = setInterval(updateCoverageProgress, 5000);
+}
+
+function createCoverageToggle() {
+    const togglePanel = document.createElement('div');
+    togglePanel.className = 'toggle-coverage-panel';
+    togglePanel.innerHTML = `
+        <div class="toggle-coverage-info">
+            <div class="toggle-coverage-label">🧩 Cobertura Territorial</div>
+            <div class="toggle-coverage-subtitle" id="coverageSubtitle">0/0 buffers ajustados</div>
+        </div>
+        <label class="switch">
+            <input type="checkbox" id="toggleCoverageLayer" ${coverageLayerEnabled ? 'checked' : ''}>
+            <span class="slider"></span>
+        </label>
+    `;
+    
+    document.body.appendChild(togglePanel);
+    
+    // Event listener para el toggle
+    document.getElementById('toggleCoverageLayer').addEventListener('change', (e) => {
+        coverageLayerEnabled = e.target.checked;
+        toggleCoverageLayer();
+    });
+}
+
+function toggleCoverageLayer() {
+    if (coverageLayerEnabled) {
+        showNotification("🧩 Activada capa de cobertura territorial", "info");
+        updateCoverageVisualization();
+        document.body.classList.add('coverage-mode');
+    } else {
+        showNotification("Capa de cobertura desactivada", "info");
+        resetCoverageVisualization();
+        document.body.classList.remove('coverage-mode');
+    }
+}
+
+function updateCoverageVisualization() {
+    // Ocultar/mostrar buffers según estado de ajuste
+    editableBuffers.forEach((data, ni) => {
+        const isAdjusted = adjustedBuffers.has(ni);
+        const isEmpty = emptyBuffers.has(ni);
+        
+        if (isEmpty) {
+            // Buffers vacíos - muy tenues
+            data.circle.setStyle({ 
+                opacity: 0.2,
+                fillOpacity: 0.02,
+                color: '#6e7681'
+            });
+        } else if (isAdjusted) {
+            // Buffers ajustados - verde brillante
+            data.circle.setStyle({ 
+                opacity: 0.8,
+                fillOpacity: 0.2,
+                color: '#3fb950',
+                weight: 3
+            });
+        } else {
+            // Buffers sin ajustar - rojo
+            data.circle.setStyle({ 
+                opacity: 0.6,
+                fillOpacity: 0.1,
+                color: '#f85149',
+                weight: 2
+            });
+        }
+    });
+    
+    customBuffers.forEach(buffer => {
+        buffer.circle.setStyle({ 
+            opacity: 0.7,
+            fillOpacity: 0.15,
+            color: '#a371f7',
+            weight: 2
+        });
+    });
+}
+
+function resetCoverageVisualization() {
+    // Restaurar estilos originales
+    editableBuffers.forEach((data, ni) => {
+        const isEmpty = emptyBuffers.has(ni);
+        
+        if (isEmpty) {
+            data.circle.setStyle({ 
+                color: '#6e7681', 
+                fillColor: '#6e7681',
+                opacity: 0.3,
+                fillOpacity: 0.05,
+                dashArray: '5,5'
+            });
+        } else {
+            data.circle.setStyle({ 
+                color: editMode ? '#f0883e' : '#58a6ff', 
+                fillColor: editMode ? '#f0883e' : '#58a6ff',
+                opacity: editMode ? 0.6 : 0.6,
+                fillOpacity: editMode ? 0.2 : 0.08,
+                weight: editMode ? 3 : 2,
+                dashArray: null
+            });
+        }
+    });
+    
+    customBuffers.forEach(buffer => {
+        buffer.circle.setStyle({ 
+            color: '#a371f7', 
+            fillColor: '#a371f7',
+            opacity: 0.7,
+            fillOpacity: 0.15,
+            weight: 2
+        });
+    });
+}
+
+function updateAdjustedBuffers() {
+    // Un buffer se considera "ajustado" si ha sido movido de su posición original
+    editableBuffers.forEach((data, ni) => {
+        const pos = data.circle.getLatLng();
+        const originalPos = data.originalPos;
+        
+        const wasMoved = haversineMeters(pos.lat, pos.lng, originalPos.lat, originalPos.lng) > 100; // Más de 100 metros
+        
+        if (wasMoved) {
+            adjustedBuffers.add(ni);
+        } else {
+            adjustedBuffers.delete(ni);
+        }
+    });
+}
+
+function updateCoverageProgress() {
+    updateAdjustedBuffers();
+    
+    const totalBuffers = editableBuffers.size;
+    const adjustedCount = adjustedBuffers.size;
+    const emptyCount = emptyBuffers.size;
+    const activeCount = totalBuffers - emptyCount;
+    const percentage = activeCount > 0 ? Math.round((adjustedCount / activeCount) * 100) : 0;
+    
+    // Actualizar subtítulo
+    const subtitle = document.getElementById('coverageSubtitle');
+    if (subtitle) {
+        subtitle.textContent = `${adjustedCount}/${activeCount} buffers ajustados (${percentage}%)`;
+    }
+    
+    // Actualizar barra de progreso si existe
+    const progressFill = document.getElementById('coverageProgressFill');
+    if (progressFill) {
+        progressFill.style.width = `${percentage}%`;
+    }
+    
+    // Si llegamos al 100%, mostrar notificación
+    if (percentage === 100 && activeCount > 0) {
+        showNotification("🎉 ¡Cobertura territorial completa! Todo ajustado al 100%", "success");
+    }
+    
+    return { totalBuffers, adjustedCount, emptyCount, percentage };
+}
+
+// ==================== FUNCIONES DE INTERFAZ NUEVAS ====================
+function showCoverageProgressPanel() {
+    const stats = updateCoverageProgress();
+    
+    const panel = document.createElement('div');
+    panel.className = 'delete-confirm-panel';
+    panel.style.minWidth = '350px';
+    panel.innerHTML = `
+        <div class="delete-confirm-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21.2 15c.7-1.2 1-2.5.8-3.9-.3-1.9-1.5-3.6-3.2-4.5-2.7-1.5-6.1-.9-8.3 1.5-2.2 2.4-2.6 6-.9 8.8 1.7 2.8 5 4 8.1 3.1"/>
+                <path d="M16 16v4"/>
+                <path d="M12 16v4"/>
+                <path d="M8 16v4"/>
+                <path d="M3 16v4"/>
+                <path d="M3 12h18"/>
+            </svg>
+            Progreso de Cobertura Territorial
+        </div>
+        
+        <div class="coverage-progress">
+            <div class="progress-value">${stats.percentage}%</div>
+            <div class="progress-bar-container">
+                <div class="progress-bar-fill" id="coverageProgressFill" style="width: ${stats.percentage}%"></div>
+            </div>
+            <div class="progress-stats">
+                <span>Buffers ajustados: ${stats.adjustedCount}</span>
+                <span>Buffers vacíos: ${stats.emptyCount}</span>
+                <span>Total: ${stats.totalBuffers}</span>
+            </div>
+        </div>
+        
+        <div style="margin-top: 16px;">
+            <button class="btn-action" onclick="scanAndRemoveEmptyBuffers()" style="width: 100%; margin-bottom: 8px;">
+                🗑️ Eliminar Buffers Vacíos
+            </button>
+            <button class="btn-action" onclick="completeCoverage()" style="width: 100%; margin-bottom: 8px;">
+                🎯 Completar Cobertura Automáticamente
+            </button>
+            <button class="btn-cancel-delete" onclick="this.closest('.delete-confirm-panel').remove()" style="width: 100%;">
+                Cerrar
+            </button>
+        </div>
+    `;
+    
+    document.body.appendChild(panel);
+}
+
+// ==================== MODIFICACIONES A FUNCIONES EXISTENTES ====================
+
+// Modificar enableDeleteMode para usar nueva interfaz
+function enableDeleteMode() {
+    deleteMode = true;
+    const btn = document.getElementById("btnDeleteBuffers");
+    if (btn) btn.classList.add("active");
+    
+    document.body.classList.add('delete-mode-active');
+    
+    // Hacer los buffers personalizados clickeables para seleccionar para eliminar
+    customBuffers.forEach(buffer => {
+        buffer.circle.off('click');
+        buffer.circle.on('click', (e) => {
+            L.DomEvent.stopPropagation(e);
+            if (deleteMode) {
+                selectBufferForDelete(buffer, true);
+            }
+        });
+    });
+    
+    // También para buffers editables (núcleos)
+    editableBuffers.forEach((data, ni) => {
+        data.circle.off('click');
+        data.circle.on('click', (e) => {
+            L.DomEvent.stopPropagation(e);
+            if (deleteMode) {
+                showNotification("⚠️ Los buffers de núcleo no se pueden eliminar, solo mover", "error");
+                selectBufferForDelete({...data, name: `Núcleo ${ni}`}, false);
+            }
+        });
+    });
+    
+    showNotification("🗑️ Modo borrado activado. Haz clic en un buffer y presiona Suprimir para eliminar.", "info");
+}
+
+// Modificar disableDeleteMode
+function disableDeleteMode() {
+    deleteMode = false;
+    const btn = document.getElementById("btnDeleteBuffers");
+    if (btn) btn.classList.remove("active");
+    
+    document.body.classList.remove('delete-mode-active');
+    cancelDeleteSelection();
+    
+    // Restaurar comportamiento normal
+    customBuffers.forEach(buffer => {
+        buffer.circle.off('click');
+        buffer.circle.on('click', (e) => { 
+            L.DomEvent.stopPropagation(e); 
+            showBufferPopup(buffer, true); 
+        });
+    });
+    
+    editableBuffers.forEach((data, ni) => {
+        data.circle.off('click');
+        data.circle.on('click', (e) => { 
+            if (!editMode) showBufferPopup(data, false); 
+        });
+    });
+}
+
+// Modificar makeBufferDraggable para rastrear ajustes
+function makeBufferDraggable(circle, data, isCustom, ni = null) {
+    let isDragging = false;
+    let startPos = null;
+    
+    circle.on('mousedown', function(e) {
+        if (!editMode) return;
+        isDragging = true; 
+        data.isDragging = true;
+        startPos = circle.getLatLng();
+        map.dragging.disable();
+        circle.setStyle({ weight: 4, fillOpacity: 0.3 });
+        
+        const onMove = (e) => { 
+            if (isDragging) circle.setLatLng(e.latlng); 
+        };
+        
+        const onUp = () => {
+            isDragging = false; 
+            data.isDragging = false;
+            map.dragging.enable();
+            circle.setStyle({ 
+                weight: isCustom ? 2 : 3, 
+                fillOpacity: isCustom ? 0.15 : 0.2 
+            });
+            map.off('mousemove', onMove); 
+            map.off('mouseup', onUp);
+            
+            const endPos = circle.getLatLng();
+            data.currentPos = endPos;
+            if (isCustom) { 
+                data.lat = endPos.lat; 
+                data.lng = endPos.lng; 
+            }
+            
+            // Marcar como ajustado si se movió significativamente
+            if (startPos && haversineMeters(startPos.lat, startPos.lng, endPos.lat, endPos.lng) > 100) {
+                if (ni !== null) adjustedBuffers.add(ni);
+                updateCoverageProgress();
+            }
+            
+            markAsChanged();
+            regenerateAnimations();
+            showNotification("Buffer reposicionado", "info");
+        };
+        
+        map.on('mousemove', onMove);
+        map.on('mouseup', onUp);
+    });
+}
+
+// Modificar drawBuffersEditable para inicializar emptyBuffers
+function drawBuffersEditable(nucleos, selected, nucleoStats) {
+    const savedState = loadBuffersState();
+    const savedPositions = new Map();
+    if (savedState?.editableBuffers) savedState.editableBuffers.forEach(s => savedPositions.set(s.ni, { lat: s.currentLat, lng: s.currentLng }));
+    
+    selected.forEach(ni => {
+        const n = nucleos[ni], st = nucleoStats[ni];
+        const savedPos = savedPositions.get(ni);
+        const lat = savedPos ? savedPos.lat : n.lat, lng = savedPos ? savedPos.lng : n.lng;
+        const circle = L.circle([lat, lng], { 
+            radius: BUFFER_RADIUS_M, 
+            color: '#58a6ff', 
+            fillColor: '#58a6ff', 
+            weight: 2, 
+            opacity: 0.6, 
+            fillOpacity: 0.08, 
+            renderer: canvasRenderer 
+        });
+        circle.addTo(layers.buffers);
+        circle.on('click', (e) => { if (!editMode) showBufferPopup(editableBuffers.get(ni), false); });
+        editableBuffers.set(ni, { 
+            circle, 
+            nucleo: n, 
+            stats: st, 
+            originalPos: { lat: n.lat, lng: n.lng }, 
+            currentPos: { lat, lng }, 
+            isDragging: false 
+        });
+        
+        // Verificar si está vacío inicialmente
+        const metrics = calculateBufferMetricsDetailed({lat, lng}, BUFFER_RADIUS_M);
+        if (metrics.iesCount === 0) {
+            emptyBuffers.add(ni);
+            circle.setStyle({ 
+                color: '#6e7681', 
+                fillColor: '#6e7681',
+                opacity: 0.3,
+                fillOpacity: 0.05,
+                dashArray: '5,5'
+            });
+        }
+    });
+    
+    if (savedState?.customBuffers) savedState.customBuffers.forEach(s => restoreCustomBuffer(s));
+}
+
+// ==================== INICIALIZACIÓN COMPLETA ====================
+document.addEventListener("DOMContentLoaded", () => {
+    if (_initialized) return;
+    _initialized = true;
+    initMap();
+    setupControls();
+    setupEditControls();
+    initKeyboardShortcuts();
+    initCoverageLayer();
+    loadCSV();
+});
+
+// ==================== NUEVAS FUNCIONES PARA LA INTERFAZ ====================
+window.scanAndRemoveEmptyBuffers = scanAndRemoveEmptyBuffers;
+window.showCoverageProgressPanel = showCoverageProgressPanel;
+window.selectBufferForDelete = selectBufferForDelete;
+window.confirmDeleteSelectedBuffer = confirmDeleteSelectedBuffer;
+window.cancelDeleteSelection = cancelDeleteSelection;
+
+// Agregar botón al panel de leyenda
+// Buscar en index.html y añadir esto en la sección de "Leyenda":
+/*
+<div class="legend-section">
+    <div class="legend-title">🧩 Cobertura Territorial</div>
+    <div class="legend-help">
+        <p>Verde: Buffers ya ajustados manualmente</p>
+        <p>Rojo: Buffers que aún necesitan ajuste</p>
+        <p>Gris: Buffers vacíos (sin instituciones)</p>
+        <button class="btn-analysis" onclick="showCoverageProgressPanel()">
+            📊 Ver Progreso de Cobertura
+        </button>
+        <button class="btn-analysis" onclick="scanAndRemoveEmptyBuffers()" style="margin-top: 8px;">
+            🗑️ Eliminar Buffers Vacíos
+        </button>
+    </div>
+</div>
+*/
