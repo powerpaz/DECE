@@ -1077,3 +1077,41 @@ body {
         max-width: none;
     }
 }
+
+/* ===============================================
+   AÑADIR BUFFERS - NUEVOS ESTILOS
+   =============================================== */
+
+/* Cursor crosshair para modo añadir */
+.leaflet-container.adding-buffer {
+    cursor: crosshair !important;
+}
+
+/* Badge para buffer personalizado */
+.custom-buffer-badge {
+    margin-top: 8px;
+    padding: 6px 12px;
+    background: rgba(163, 113, 247, 0.15);
+    border: 1px solid var(--accent-purple);
+    border-radius: 6px;
+    display: inline-block;
+    font-size: 12px;
+}
+
+/* Botón eliminar con estilo diferente */
+.btn-delete {
+    background: rgba(248, 81, 73, 0.1) !important;
+    border-color: var(--accent-red) !important;
+    color: var(--accent-red) !important;
+}
+
+.btn-delete:hover {
+    background: var(--accent-red) !important;
+    color: #fff !important;
+}
+
+/* Buffer personalizado (púrpura) */
+.custom-buffer-circle {
+    stroke: var(--accent-purple) !important;
+    fill: var(--accent-purple) !important;
+}
