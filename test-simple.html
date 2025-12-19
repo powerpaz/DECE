@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DECE - Test Diagnóstico</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+        }
+        
+        #toolbar {
+            background: #333;
+            padding: 10px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            cursor: pointer;
+            background: #555;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        
+        button:hover {
+            background: #777;
+        }
+        
+        button.active {
+            background: #0a0;
+        }
+        
+        #map {
+            width: 100%;
+            height: calc(100vh - 60px);
+        }
+        
+        #console {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 200px;
+            background: #000;
+            color: #0f0;
+            font-family: monospace;
+            padding: 10px;
+            overflow-y: auto;
+            border-top: 2px solid #0f0;
+        }
+    </style>
+</head>
+<body>
+    <div id="toolbar">
+        <button id="btnEditBuffers">✏️ Editar</button>
+        <button id="btnAddBuffers">➕ Añadir</button>
+        <button id="btnDeleteBuffers">🗑️ Eliminar</button>
+        <button onclick="location.reload()">🔄 Recargar</button>
+    </div>
+    
+    <div id="map"></div>
+    
+    <div id="console">
+        <strong>🔍 CONSOLA DE DIAGNÓSTICO</strong><br>
+        Mira aquí y en la consola del navegador (F12)<br>
+        <div id="log"></div>
+    </div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Script de diagnóstico -->
+    <script src="app-debug.js"></script>
+    
+    <script>
+        // Redirigir console.log a la pantalla
+        const logDiv = document.getElementById('log');
+        const originalLog = console.log;
+        const originalError = console.error;
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            logDiv.innerHTML += args.join(' ') + '<br>';
+            logDiv.scrollTop = logDiv.scrollHeight;
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            logDiv.innerHTML += '<span style="color:red">' + args.join(' ') + '</span><br>';
+            logDiv.scrollTop = logDiv.scrollHeight;
+        };
+    </script>
+</body>
+</html>
