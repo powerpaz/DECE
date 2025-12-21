@@ -1,0 +1,268 @@
+<!-- ============================================ -->
+<!-- NUEVOS CONTROLES DE GESTIÓN DE ESTADO      -->
+<!-- Agregar este código dentro del panel de    -->
+<!-- edición de tu index.html                    -->
+<!-- ============================================ -->
+
+<div class="control-section storage-controls">
+  <div class="section-title">
+    <span class="section-icon">💾</span>
+    Gestión de Posiciones
+  </div>
+  
+  <div class="section-subtitle">
+    Las posiciones se guardan automáticamente cada 2 segundos
+  </div>
+  
+  <!-- Botón Manual de Guardado -->
+  <button id="btnSaveChanges" class="control-btn primary" onclick="saveBuffersState()">
+    <span class="btn-icon">💾</span>
+    <span class="btn-text">Guardar Cambios</span>
+  </button>
+  
+  <!-- Exportar Posiciones -->
+  <button id="btnExportState" class="control-btn" onclick="exportBuffersState()" 
+          title="Descarga un archivo JSON con todas las posiciones de buffers">
+    <span class="btn-icon">📤</span>
+    <span class="btn-text">Exportar Posiciones</span>
+  </button>
+  
+  <!-- Importar Posiciones -->
+  <button id="btnImportState" class="control-btn" 
+          onclick="document.getElementById('fileImportState').click()"
+          title="Carga posiciones desde un archivo JSON previamente exportado">
+    <span class="btn-icon">📥</span>
+    <span class="btn-text">Importar Posiciones</span>
+  </button>
+  <input type="file" id="fileImportState" accept=".json" style="display: none" 
+         onchange="importBuffersState(this.files[0])">
+  
+  <!-- Restaurar Backup -->
+  <button id="btnRestoreBackup" class="control-btn warning" 
+          onclick="restoreFromBackup()"
+          title="Restaura el estado anterior al último guardado">
+    <span class="btn-icon">⏮️</span>
+    <span class="btn-text">Restaurar Backup</span>
+  </button>
+  
+  <!-- Reiniciar Todo -->
+  <button id="btnClearState" class="control-btn danger" 
+          onclick="clearBuffersState()"
+          title="ADVERTENCIA: Elimina todas las posiciones guardadas">
+    <span class="btn-icon">🗑️</span>
+    <span class="btn-text">Reiniciar Todo</span>
+  </button>
+  
+  <!-- Estado de Guardado -->
+  <div class="save-info">
+    <div class="save-info-row">
+      <span class="info-label">📊 Buffers guardados:</span>
+      <span id="savedBuffersCount" class="info-value">-</span>
+    </div>
+    <div class="save-info-row">
+      <span class="info-label">📅 Último guardado:</span>
+      <span id="lastSaveTime" class="info-value">Nunca</span>
+    </div>
+    <div class="save-info-row">
+      <span class="info-label">💾 Tamaño de datos:</span>
+      <span id="storageSize" class="info-value">-</span>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- CSS ADICIONAL PARA LOS NUEVOS CONTROLES    -->
+<!-- Agregar este código a tu style.css          -->
+<!-- ============================================ -->
+
+<style>
+/* Sección de controles de almacenamiento */
+.storage-controls {
+  background: rgba(13, 17, 23, 0.6);
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.section-subtitle {
+  color: #8b949e;
+  font-size: 12px;
+  margin-bottom: 16px;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+/* Botones de control mejorados */
+.control-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #21262d, #161b22);
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  color: #c9d1d9;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.control-btn:hover {
+  background: linear-gradient(135deg, #30363d, #21262d);
+  border-color: #58a6ff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(88, 166, 255, 0.2);
+}
+
+.control-btn.primary {
+  background: linear-gradient(135deg, #238636, #2ea043);
+  border-color: #3fb950;
+}
+
+.control-btn.primary:hover {
+  background: linear-gradient(135deg, #2ea043, #3fb950);
+  box-shadow: 0 4px 12px rgba(63, 185, 80, 0.3);
+}
+
+.control-btn.primary.has-changes {
+  background: linear-gradient(135deg, #f85149, #da3633);
+  border-color: #f85149;
+  animation: pulse-save 2s ease-in-out infinite;
+}
+
+.control-btn.warning {
+  background: linear-gradient(135deg, #9e6a03, #bb7506);
+  border-color: #d29922;
+}
+
+.control-btn.warning:hover {
+  background: linear-gradient(135deg, #bb7506, #d29922);
+  box-shadow: 0 4px 12px rgba(210, 153, 34, 0.3);
+}
+
+.control-btn.danger {
+  background: linear-gradient(135deg, #a40e26, #c93c37);
+  border-color: #f85149;
+}
+
+.control-btn.danger:hover {
+  background: linear-gradient(135deg, #c93c37, #f85149);
+  box-shadow: 0 4px 12px rgba(248, 81, 73, 0.3);
+}
+
+.btn-icon {
+  font-size: 18px;
+}
+
+.btn-text {
+  flex: 1;
+  text-align: left;
+}
+
+/* Info de guardado */
+.save-info {
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(88, 166, 255, 0.05);
+  border: 1px solid rgba(88, 166, 255, 0.2);
+  border-radius: 8px;
+}
+
+.save-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  color: #8b949e;
+  font-size: 12px;
+}
+
+.info-label {
+  font-weight: 500;
+}
+
+.info-value {
+  color: #58a6ff;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+}
+
+/* Animación de guardado pendiente */
+@keyframes pulse-save {
+  0%, 100% {
+    box-shadow: 0 4px 12px rgba(248, 81, 73, 0.3);
+  }
+  50% {
+    box-shadow: 0 4px 20px rgba(248, 81, 73, 0.6);
+  }
+}
+
+/* Icono de sección */
+.section-icon {
+  font-size: 20px;
+  margin-right: 8px;
+}
+</style>
+
+<!-- ============================================ -->
+<!-- JAVASCRIPT ADICIONAL                        -->
+<!-- Agregar este código a tu app.js             -->
+<!-- ============================================ -->
+
+<script>
+// Actualizar info de guardado en la UI
+function updateStorageInfo() {
+  const state = loadBuffersState();
+  
+  if (state) {
+    // Contar buffers
+    const totalBuffers = (state.editableBuffers?.length || 0) + 
+                        (state.customBuffers?.length || 0);
+    const countEl = document.getElementById('savedBuffersCount');
+    if (countEl) countEl.textContent = totalBuffers;
+    
+    // Último guardado
+    if (state.timestamp) {
+      const date = new Date(state.timestamp);
+      const timeEl = document.getElementById('lastSaveTime');
+      if (timeEl) {
+        timeEl.textContent = date.toLocaleString('es-EC', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      }
+    }
+    
+    // Tamaño de datos
+    const jsonStr = localStorage.getItem(STORAGE_KEY);
+    if (jsonStr) {
+      const sizeKB = (new Blob([jsonStr]).size / 1024).toFixed(2);
+      const sizeEl = document.getElementById('storageSize');
+      if (sizeEl) sizeEl.textContent = `${sizeKB} KB`;
+    }
+  }
+}
+
+// Llamar después de cada guardado
+function saveBuffersState() {
+  // ... código de guardado existente ...
+  
+  // Al final, actualizar UI
+  updateStorageInfo();
+}
+
+// Llamar al cargar la página
+window.addEventListener('load', () => {
+  updateStorageInfo();
+  
+  // Actualizar cada 5 segundos
+  setInterval(updateStorageInfo, 5000);
+});
+</script>
